@@ -1443,7 +1443,7 @@ function reaplicarValidacoesCRM_Interno_(crmSheet, legendSheet) {
   const totalRows = Math.max(crmSheet.getMaxRows() - APP.CRM_LAYOUT.HEADER_ROW, 1);
   const editableRows = Math.max(crmSheet.getMaxRows() - 1, 1);
   const languageList = getNonEmptyValuesFromColumn_(legendSheet, 16, 2); // P
-  const professorList = getProfessorOptions_(legendSheet);
+  const professorRange = getProfessorOptionsRange_(legendSheet);
   const stageList = getCRMManualStageOptions_();
 
   crmSheet
@@ -1459,9 +1459,9 @@ function reaplicarValidacoesCRM_Interno_(crmSheet, legendSheet) {
     crmSheet.getRange(APP.CRM_LAYOUT.DATA_START_ROW, APP.CRM_COLS.LANGUAGE, totalRows, 1).setDataValidation(rule);
   }
 
-  if (professorList.length) {
+  if (professorRange) {
     const rule = SpreadsheetApp.newDataValidation()
-      .requireValueInList(professorList, true)
+      .requireValueInRange(professorRange, true)
       .setAllowInvalid(false)
       .build();
 
@@ -4029,8 +4029,14 @@ function safeSetColumnWidths_(sheet, definitions) {
 }
 
 function writeVerticalList_(sheet, startRow, startCol, values) {
-  // Limpa uma faixa segura antes de reescrever
-  sheet.getRange(startRow, startCol, 100, 1).clearContent();
+  const rowsToClear = Math.max(100, values && values.length ? values.length : 0);
+  const requiredLastRow = startRow + rowsToClear - 1;
+
+  if (sheet.getMaxRows() < requiredLastRow) {
+    sheet.insertRowsAfter(sheet.getMaxRows(), requiredLastRow - sheet.getMaxRows());
+  }
+
+  sheet.getRange(startRow, startCol, rowsToClear, 1).clearContent();
 
   if (!values || !values.length) return;
 
@@ -4116,6 +4122,17 @@ function getProfessorOptions_(legendSheet) {
       return normalizeText_(candidate) === normalizedValue;
     }) === index;
   });
+}
+
+function getProfessorOptionsRange_(legendSheet) {
+  const professorOptions = getProfessorOptions_(legendSheet);
+
+  if (!professorOptions.length) {
+    return null;
+  }
+
+  writeVerticalList_(legendSheet, 2, 15, professorOptions); // O2:O
+  return legendSheet.getRange(2, 15, professorOptions.length, 1);
 }
 
 function clearSheetBody_(sheet, numCols, startRow, startCol) {
