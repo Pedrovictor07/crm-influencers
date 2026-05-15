@@ -43,9 +43,12 @@ const APP = Object.freeze({
     TABLE_HEADER_ROW: 3,
     TABLE_DATA_START_ROW: 4,
     INPUT_HANDLE_COLUMN: 1,
-    INPUT_APPROVAL_COLUMN: 2,
-    DIVIDER_COLUMN: 3,
-    TABLE_START_COLUMN: 4
+    INPUT_NAME_COLUMN: 2,
+    INPUT_EMAIL_COLUMN: 3,
+    INPUT_APPROVAL_COLUMN: 4,
+    INPUT_WIDTH: 4,
+    DIVIDER_COLUMN: 5,
+    TABLE_START_COLUMN: 6
   }),
 
   // Cabeçalhos da base local do atendente
@@ -75,7 +78,7 @@ const APP = Object.freeze({
     'Origem do Registro',           // W
     'Pedido de Indicação',           // X
     'Fonte Do Influencer',          // Y
-    'Reservado Z',                  // Z
+    'Data Última Alteração de Etapa', // Z
     'Email',                        // AA
     'Email 01 enviado em',          // AB
     'Email 02 enviado em',          // AC
@@ -107,8 +110,8 @@ const APP = Object.freeze({
     'Link do instagram',            // H
     'Comentários',                  // I
     'Etapa / Status',               // J
-    'Instruções',                   // K
-    'Fonte Do Influencer',          // L
+    'Fonte Do Influencer',          // K
+    'Instruções',                   // L
     'ID'                            // M
   ]),
 
@@ -150,6 +153,7 @@ const APP = Object.freeze({
     RECORD_ORIGIN: 23,
     INDICATION_REQUEST: 24,
     INFLUENCER_SOURCE: 25,
+    LAST_STAGE_CHANGE: 26,
     EMAIL: 27,
     EMAIL_01_SENT_AT: 28,
     EMAIL_02_SENT_AT: 29,
@@ -173,16 +177,16 @@ const APP = Object.freeze({
   }),
 
   CAPTACAO_COLS: Object.freeze({
-    HANDLE: 4,
-    NAME: 5,
-    EMAIL: 6,
-    PHONE: 7,
-    INSTAGRAM_LINK: 8,
-    COMMENTS: 9,
-    STAGE: 10,
-    MESSAGE: 11,
-    SOURCE: 12,
-    ID: 13
+    HANDLE: 6,
+    NAME: 7,
+    EMAIL: 8,
+    PHONE: 9,
+    INSTAGRAM_LINK: 10,
+    COMMENTS: 11,
+    STAGE: 12,
+    SOURCE: 13,
+    MESSAGE: 14,
+    ID: 15
   }),
 
   CRM_STAGES: Object.freeze([
@@ -324,6 +328,11 @@ const APP = Object.freeze({
       CONTACT_EMAIL_COLUMN: 12,        // L
       OWNED_INFLUENCER_COLUMN: 16,     // P
       CONTACT_HISTORY_LOOKBACK: 3000
+    }),
+    PROFESSORS: Object.freeze({
+      ENABLED: true,
+      SPREADSHEET_ID: '1-Y2TsEPCf75WNeh6fIbNZMnpSJlil4sBwdduYTKW-oc',
+      SHEET_NAME: 'DB Profs completo'
     })
   }),
 
@@ -531,7 +540,7 @@ function getCaptacaoSyncFieldMap_() {
     { viewCol: 4, baseCol: APP.BASE_COLS.PHONE, label: 'Telefone', type: 'text' },
     { viewCol: 6, baseCol: APP.BASE_COLS.OBS, label: 'Comentários', type: 'text' },
     { viewCol: 7, baseCol: APP.BASE_COLS.STAGE, label: 'Etapa / Status', type: 'text' },
-    { viewCol: 9, baseCol: APP.BASE_COLS.INFLUENCER_SOURCE, label: 'Fonte Do Influencer', type: 'text' }
+    { viewCol: 8, baseCol: APP.BASE_COLS.INFLUENCER_SOURCE, label: 'Fonte Do Influencer', type: 'text' }
   ];
 }
 
@@ -560,8 +569,8 @@ function getCaptacaoSheetLayoutInfo_(captacaoSheet) {
     instagramLink: getCaptacaoSheetHeaderPosition_(headerValues, 'Link do instagram', 5),
     comments: getCaptacaoSheetHeaderPosition_(headerValues, 'Comentários', 6),
     stage: getCaptacaoSheetHeaderPosition_(headerValues, 'Etapa / Status', 7),
-    message: getCaptacaoSheetHeaderPosition_(headerValues, 'Instruções', 8),
-    source: getCaptacaoSheetHeaderPosition_(headerValues, 'Fonte Do Influencer', 9),
+    source: getCaptacaoSheetHeaderPosition_(headerValues, 'Fonte Do Influencer', 8),
+    message: getCaptacaoSheetHeaderPosition_(headerValues, 'Instruções', 9),
     id: getCaptacaoSheetHeaderPosition_(headerValues, 'ID', 10)
   };
 
@@ -926,6 +935,7 @@ function handleCRMEdit_(e) {
     sheet: sheet,
     rowNumber: rowNumber,
     stageColumn: APP.CRM_COLS.STAGE,
+    professorColumn: APP.CRM_COLS.PROFESSOR,
     showDateColumn: APP.CRM_COLS.SHOW_DATE,
     nextFollowUpColumn: APP.CRM_COLS.NEXT_FOLLOWUP,
     oldStageValue: typeof e.oldValue === 'undefined' ? '' : e.oldValue
@@ -1010,7 +1020,9 @@ function sincronizarBancoDeDadosParaBase_(ctx, baseRows, logs) {
 
     if (!areValuesEqualByType_(oldStage, newStage, 'text')) {
       baseRow[APP.BASE_COLS.STAGE - 1] = newStage;
-      baseRow[APP.BASE_COLS.LAST_INTERACTION - 1] = new Date();
+      const now = new Date();
+      baseRow[APP.BASE_COLS.LAST_INTERACTION - 1] = now;
+      baseRow[APP.BASE_COLS.LAST_STAGE_CHANGE - 1] = now;
       baseRow[APP.BASE_COLS.ATTENDANT - 1] = ctx.attendantName;
       updatedRecords++;
 
@@ -1170,13 +1182,14 @@ function configurarBaseDoAtendente_(baseSheet) {
   baseSheet.getRange('B:B').setNumberFormat('dd/MM/yyyy HH:mm:ss');
   baseSheet.getRange('I:I').setNumberFormat('dd/MM/yyyy HH:mm:ss');
   baseSheet.getRange('J:K').setNumberFormat('dd/MM/yyyy');
+  baseSheet.getRange('Z:Z').setNumberFormat('dd/MM/yyyy HH:mm:ss');
   baseSheet.getRange('AB:AD').setNumberFormat('dd/MM/yyyy HH:mm:ss');
 
   // Larguras sugeridas
   safeSetColumnWidths_(baseSheet, [
     [1, 160], [2, 150], [3, 220], [4, 150], [5, 120], [7, 170], [8, 160],
     [9, 150], [10, 130], [11, 150], [17, 140], [18, 260], [19, 160], [21, 180],
-    [22, 180], [23, 170], [24, 170], [25, 170], [27, 220]
+    [22, 180], [23, 170], [24, 170], [25, 170], [26, 180], [27, 220]
   ]);
 
   baseSheet.hideColumns(APP.BASE_COLS.EMAIL_01_SENT_AT, 3);
@@ -1187,30 +1200,32 @@ function configurarCaptacao_(captacaoSheet) {
   captacaoSheet
     .getRange(1, 1, captacaoSheet.getMaxRows(), captacaoSheet.getMaxColumns())
     .clearDataValidations();
-  captacaoSheet.getRange(1, 1, captacaoSheet.getMaxRows(), 13).breakApart();
+  captacaoSheet
+    .getRange(1, 1, captacaoSheet.getMaxRows(), APP.CAPTACAO_COLS.ID)
+    .breakApart();
 
-  captacaoSheet.getRange('A1:B1').merge().setValue('Influencers captados esse mês');
-  captacaoSheet.getRange('A2:B2').merge();
-  captacaoSheet.getRange('A3:B3').merge().setValue('INSERIR NOVOS INFLUS ABAIXO');
-  captacaoSheet.getRange('A4:B4').setValues([['@', 'Aprovação']]);
+  captacaoSheet.getRange('A1:D1').merge().setValue('Influencers captados esse mês');
+  captacaoSheet.getRange('A2:D2').merge();
+  captacaoSheet.getRange('A3:D3').merge().setValue('INSERIR NOVOS INFLUS ABAIXO');
+  captacaoSheet.getRange('A4:D4').setValues([['@', 'Nome', 'Email', 'Aprovação']]);
 
-  captacaoSheet.getRange('D1:E1').merge().setValue('influs enviados para o CRM no mês');
-  captacaoSheet.getRange('F1:G1').merge().setValue('influs com AS agendada no mês');
-  captacaoSheet.getRange('H1:I1').merge().setValue('influs fechados no mês');
-  captacaoSheet.getRange('D2:E2').merge();
+  captacaoSheet.getRange('F1:G1').merge().setValue('influs enviados para o CRM no mês');
+  captacaoSheet.getRange('H1:I1').merge().setValue('influs com AS agendada no mês');
+  captacaoSheet.getRange('J1:K1').merge().setValue('influs fechados no mês');
   captacaoSheet.getRange('F2:G2').merge();
   captacaoSheet.getRange('H2:I2').merge();
-  captacaoSheet.getRange('D2').clearContent();
+  captacaoSheet.getRange('J2:K2').merge();
   captacaoSheet.getRange('F2').clearContent();
   captacaoSheet.getRange('H2').clearContent();
+  captacaoSheet.getRange('J2').clearContent();
   captacaoSheet
     .getRange(APP.CAPTACAO_LAYOUT.TABLE_HEADER_ROW, APP.CAPTACAO_LAYOUT.TABLE_START_COLUMN, 1, APP.CAPTACAO_HEADERS.length)
     .setValues([APP.CAPTACAO_HEADERS]);
 
-  captacaoSheet.getRange('A1:B4').setHorizontalAlignment('center');
-  captacaoSheet.getRange('D1:M3').setHorizontalAlignment('center');
-  captacaoSheet.getRange('A1:M3').setVerticalAlignment('middle');
-  captacaoSheet.getRange('A1:M3').setWrap(true);
+  captacaoSheet.getRange('A1:D4').setHorizontalAlignment('center');
+  captacaoSheet.getRange('F1:O3').setHorizontalAlignment('center');
+  captacaoSheet.getRange('A1:O3').setVerticalAlignment('middle');
+  captacaoSheet.getRange('A1:O3').setWrap(true);
   captacaoSheet
     .getRange(
       APP.CAPTACAO_LAYOUT.TABLE_DATA_START_ROW,
@@ -1221,22 +1236,22 @@ function configurarCaptacao_(captacaoSheet) {
     .setWrapStrategy(SpreadsheetApp.WrapStrategy.CLIP);
 
   captacaoSheet
-    .getRange('A1:B1')
+    .getRange('A1:D1')
     .setFontWeight('bold')
     .setBackground(HEADER_FILL_MAGENTA_LIGHT_3)
     .setFontColor(HEADER_TEXT_DARK);
-  captacaoSheet.getRange('A2:B3').setFontWeight('bold').setBackground('#f3f3f3');
+  captacaoSheet.getRange('A2:D3').setFontWeight('bold').setBackground('#f3f3f3');
   captacaoSheet
-    .getRange('A4:B4')
+    .getRange('A4:D4')
     .setFontWeight('bold')
     .setBackground(HEADER_FILL_YELLOW_LIGHT_2)
     .setFontColor(HEADER_TEXT_DARK);
   captacaoSheet
-    .getRange('D1:I1')
+    .getRange('F1:K1')
     .setFontWeight('bold')
     .setBackground(HEADER_FILL_MAGENTA_LIGHT_3)
     .setFontColor(HEADER_TEXT_DARK);
-  captacaoSheet.getRange('D2:I2').setFontWeight('bold').setBackground('#f3f3f3');
+  captacaoSheet.getRange('F2:K2').setFontWeight('bold').setBackground('#f3f3f3');
   captacaoSheet
     .getRange(APP.CAPTACAO_LAYOUT.TABLE_HEADER_ROW, APP.CAPTACAO_LAYOUT.TABLE_START_COLUMN, 1, APP.CAPTACAO_HEADERS.length)
     .setFontWeight('bold')
@@ -1249,12 +1264,12 @@ function configurarCaptacao_(captacaoSheet) {
   captacaoSheet.setFrozenRows(3);
 
   safeSetColumnWidths_(captacaoSheet, [
-    [1, 210], [2, 150], [3, 24], [4, 120], [5, 120], [6, 170], [7, 100], [8, 100], [9, 240], [10, 210], [11, 280], [12, 180], [13, 160]
+    [1, 100], [2, 100], [3, 100], [4, 100], [5, 12], [6, 120], [7, 120], [8, 170], [9, 100], [10, 100], [11, 240], [12, 210], [13, 180], [14, 280], [15, 160]
   ]);
 
-  captacaoSheet.getRange(1, 3, captacaoSheet.getMaxRows(), 1).setBackground('#e6e6e6');
+  captacaoSheet.getRange(1, APP.CAPTACAO_LAYOUT.DIVIDER_COLUMN, captacaoSheet.getMaxRows(), 1).setBackground('#e6e6e6');
   captacaoSheet
-    .getRange(APP.CAPTACAO_LAYOUT.INPUT_START_ROW, 1, captacaoSheet.getMaxRows() - APP.CAPTACAO_LAYOUT.INPUT_START_ROW + 1, 1)
+    .getRange(APP.CAPTACAO_LAYOUT.INPUT_START_ROW, APP.CAPTACAO_LAYOUT.INPUT_HANDLE_COLUMN, captacaoSheet.getMaxRows() - APP.CAPTACAO_LAYOUT.INPUT_START_ROW + 1, 3)
     .setNumberFormat('@STRING@');
   captacaoSheet
     .getRange(APP.CAPTACAO_LAYOUT.TABLE_DATA_START_ROW, APP.CAPTACAO_COLS.HANDLE, captacaoSheet.getMaxRows() - APP.CAPTACAO_LAYOUT.TABLE_DATA_START_ROW + 1, 1)
@@ -1271,6 +1286,8 @@ function configurarCaptacao_(captacaoSheet) {
   captacaoSheet
     .getRange(APP.CAPTACAO_LAYOUT.TABLE_DATA_START_ROW, APP.CAPTACAO_COLS.ID, captacaoSheet.getMaxRows() - APP.CAPTACAO_LAYOUT.TABLE_DATA_START_ROW + 1, 1)
     .setNumberFormat('@STRING@');
+  captacaoSheet.showColumns(APP.CAPTACAO_COLS.SOURCE);
+  captacaoSheet.hideColumns(APP.CAPTACAO_COLS.MESSAGE);
   captacaoSheet.hideColumns(APP.CAPTACAO_COLS.ID);
 }
 
@@ -1322,6 +1339,7 @@ function configurarBancoDeDados_(databaseSheet) {
   databaseSheet.getRange('B:B').setNumberFormat('dd/MM/yyyy HH:mm:ss');
   databaseSheet.getRange('I:I').setNumberFormat('dd/MM/yyyy HH:mm:ss');
   databaseSheet.getRange('J:K').setNumberFormat('dd/MM/yyyy');
+  databaseSheet.getRange('Z:Z').setNumberFormat('dd/MM/yyyy HH:mm:ss');
   databaseSheet.getRange('AB:AD').setNumberFormat('dd/MM/yyyy HH:mm:ss');
 
   safeSetColumnWidths_(databaseSheet, [
@@ -1425,6 +1443,7 @@ function reaplicarValidacoesCRM_Interno_(crmSheet, legendSheet) {
   const totalRows = Math.max(crmSheet.getMaxRows() - APP.CRM_LAYOUT.HEADER_ROW, 1);
   const editableRows = Math.max(crmSheet.getMaxRows() - 1, 1);
   const languageList = getNonEmptyValuesFromColumn_(legendSheet, 16, 2); // P
+  const professorList = getProfessorOptions_(legendSheet);
   const stageList = getCRMManualStageOptions_();
 
   crmSheet
@@ -1438,6 +1457,15 @@ function reaplicarValidacoesCRM_Interno_(crmSheet, legendSheet) {
       .build();
 
     crmSheet.getRange(APP.CRM_LAYOUT.DATA_START_ROW, APP.CRM_COLS.LANGUAGE, totalRows, 1).setDataValidation(rule);
+  }
+
+  if (professorList.length) {
+    const rule = SpreadsheetApp.newDataValidation()
+      .requireValueInList(professorList, true)
+      .setAllowInvalid(false)
+      .build();
+
+    crmSheet.getRange(APP.CRM_LAYOUT.DATA_START_ROW, APP.CRM_COLS.PROFESSOR, totalRows, 1).setDataValidation(rule);
   }
 
   if (stageList.length) {
@@ -1550,7 +1578,9 @@ function adicionarInflu() {
       inputRows.forEach(function (inputRow, idx) {
         const inputPosition = idx + 1;
         const rawHandle = String(inputRow[0] || '').trim();
-        const approvalStatus = String(inputRow[1] || '').trim();
+        const inputName = String(inputRow[1] || '').trim();
+        const inputEmail = String(inputRow[2] || '').trim();
+        const approvalStatus = String(inputRow[3] || '').trim();
         const approvalStatusNormalized = normalizeText_(approvalStatus);
 
         if (!rawHandle) {
@@ -1562,6 +1592,10 @@ function adicionarInflu() {
           throw new Error('Influencer ' + inputPosition + ': ' + handleResult.error);
         }
         const handle = handleResult.sanitized;
+
+        if (inputEmail && !isValidEmail_(inputEmail)) {
+          throw new Error('Influencer ' + inputPosition + ': email inválido em "' + inputEmail + '".');
+        }
 
         if (approvalStatusNormalized !== normalizeText_('Manda ver')) {
           blockedRows.push(
@@ -1577,23 +1611,24 @@ function adicionarInflu() {
 
         row[APP.BASE_COLS.ID - 1] = influencerId;
         row[APP.BASE_COLS.ENTRY_TIMESTAMP - 1] = now;
-        row[APP.BASE_COLS.NAME - 1] = '';
+        row[APP.BASE_COLS.NAME - 1] = inputName;
         row[APP.BASE_COLS.PHONE - 1] = '';
         row[APP.BASE_COLS.TAG - 1] = APP.DEFAULT_TAG;
         row[APP.BASE_COLS.STAGE - 1] = APP.DEFAULT_CAPTACAO_STAGE;
         row[APP.BASE_COLS.ATTENDANT - 1] = ctx.attendantName;
         row[APP.BASE_COLS.LAST_INTERACTION - 1] = now;
+        row[APP.BASE_COLS.LAST_STAGE_CHANGE - 1] = now;
         row[APP.BASE_COLS.CURRENT_PIPELINE - 1] = APP.PIPELINES.CAPTACAO;
         row[APP.BASE_COLS.HANDLE - 1] = handle;
         row[APP.BASE_COLS.RECORD_ORIGIN - 1] = APP.PIPELINES.CAPTACAO;
         row[APP.BASE_COLS.INFLUENCER_SOURCE - 1] = '';
-        row[APP.BASE_COLS.EMAIL - 1] = '';
+        row[APP.BASE_COLS.EMAIL - 1] = inputEmail;
 
         rowsToInsert.push(row);
         logs.push(makeLogRow_({
           action: APP.LOG_ACTIONS.CREATE,
           id: influencerId,
-          name: '@' + handle,
+          name: inputName || ('@' + handle),
           field: 'Registro',
           oldValue: '',
           newValue: 'Criado via Captação',
@@ -1700,8 +1735,8 @@ function buildCaptacaoComparableRow_(record, layoutInfo) {
     instagramLink: 5,
     comments: 6,
     stage: 7,
-    message: 8,
-    source: 9,
+    source: 8,
+    message: 9,
     id: 10
   };
 
@@ -1941,6 +1976,7 @@ function getBaseValueType_(baseCol) {
     baseCol === APP.BASE_COLS.LAST_INTERACTION ||
     baseCol === APP.BASE_COLS.SHOW_DATE ||
     baseCol === APP.BASE_COLS.NEXT_FOLLOWUP ||
+    baseCol === APP.BASE_COLS.LAST_STAGE_CHANGE ||
     baseCol === APP.BASE_COLS.EMAIL_01_SENT_AT ||
     baseCol === APP.BASE_COLS.EMAIL_02_SENT_AT ||
     baseCol === APP.BASE_COLS.EMAIL_03_SENT_AT
@@ -2116,6 +2152,12 @@ function finalizeRecordStageAutomation_(ctx, originalRow, workingRow, meta, issu
   }
 
   if (!isCaptacaoPipeline && normalizeText_(record.stage) === normalizeText_('Aula Show')) {
+    if (!String(workingRow[APP.BASE_COLS.PROFESSOR - 1] || '').trim()) {
+      issues.push('"' + (record.name || ('@' + record.handle) || record.id) + '": escolha o professor antes de usar a etapa "Aula Show".');
+      revertStageRelatedFields_(workingRow, originalRow, meta);
+      return;
+    }
+
     if (isBlank_(workingRow[APP.BASE_COLS.SHOW_DATE - 1])) {
       const promptResult = options.manual
         ? ensureManualDateForRecord_('Aula Show', 'Digite a data da Aula Show no formato DD/MM/AAAA.', originalRow[APP.BASE_COLS.SHOW_DATE - 1])
@@ -2363,7 +2405,11 @@ function applyPendingEditsToCommittedRows_(ctx, originalRows, workingRows, pendi
       return;
     }
 
-    workingRow[APP.BASE_COLS.LAST_INTERACTION - 1] = new Date();
+    const now = new Date();
+    workingRow[APP.BASE_COLS.LAST_INTERACTION - 1] = now;
+    if (!areValuesEqualByType_(originalRow[APP.BASE_COLS.STAGE - 1], workingRow[APP.BASE_COLS.STAGE - 1], 'text')) {
+      workingRow[APP.BASE_COLS.LAST_STAGE_CHANGE - 1] = now;
+    }
     workingRow[APP.BASE_COLS.ATTENDANT - 1] = ctx.attendantName;
     updatedRecords += 1;
     logs.push.apply(logs, buildLogEntriesForRecordUpdate_(ctx, originalRow, workingRow, meta));
@@ -2659,6 +2705,9 @@ function enviarEmailsSelecionados_(config) {
           baseRow[APP.BASE_COLS.NEXT_FOLLOWUP - 1] = followUpDate;
           baseRow[config.sentAtCol - 1] = now;
           baseRow[APP.BASE_COLS.LAST_INTERACTION - 1] = now;
+          if (!areValuesEqualByType_(oldStage, postSendStage, 'text')) {
+            baseRow[APP.BASE_COLS.LAST_STAGE_CHANGE - 1] = now;
+          }
           baseRow[APP.BASE_COLS.ATTENDANT - 1] = ctx.attendantName;
 
           logs.push(makeLogRow_({
@@ -2721,6 +2770,7 @@ function montarBancoDeDados_Interno_(ctx, options) {
 
   ctx.databaseSheet.getRange(1, 1, 1, APP.BASE_HEADERS.length).setValues([APP.BASE_HEADERS]);
   ctx.databaseSheet.getRange('AA:AA').setNumberFormat('@STRING@');
+  ctx.databaseSheet.getRange('Z:Z').setNumberFormat('dd/MM/yyyy HH:mm:ss');
   ctx.databaseSheet.getRange('AB:AD').setNumberFormat('dd/MM/yyyy HH:mm:ss');
   ctx.databaseSheet.hideColumns(APP.BASE_COLS.EMAIL_01_SENT_AT, 3);
   clearSheetBody_(ctx.databaseSheet, APP.BASE_HEADERS.length);
@@ -2757,6 +2807,7 @@ function maybeHandleStageSelection_(params) {
   const sheet = params.sheet;
   const rowNumber = params.rowNumber;
   const stageColumn = params.stageColumn;
+  const professorColumn = params.professorColumn;
   const showDateColumn = params.showDateColumn;
   const nextFollowUpColumn = params.nextFollowUpColumn;
   const oldStageValue = params.oldStageValue;
@@ -2769,6 +2820,12 @@ function maybeHandleStageSelection_(params) {
   let newNextFollowUp = oldNextFollowUp;
 
   if (isAulaShowStage_(newStageValue)) {
+    if (professorColumn && !String(sheet.getRange(rowNumber, professorColumn).getDisplayValue() || '').trim()) {
+      SpreadsheetApp.getUi().alert('Escolha o professor antes de usar a etapa "Aula Show".');
+      sheet.getRange(rowNumber, stageColumn).setValue(oldStageValue || '');
+      return { cancelled: true };
+    }
+
     const promptResult = promptForDate_('Aula Show', 'Digite a data da Aula Show no formato DD/MM/AAAA.', oldShowDate);
 
     if (promptResult.cancelled) {
@@ -3033,6 +3090,12 @@ function syncCRMRowStageToBase_(ctx, crmRowNumber) {
     crmRowNumber,
     'Etapa / Status'
   );
+  const newProfessor = normalizeValueByType_(
+    crmRow[APP.CRM_COLS.PROFESSOR - 1],
+    'text',
+    crmRowNumber,
+    'Professor'
+  );
   const newShowDate = normalizeValueByType_(
     crmRow[APP.CRM_COLS.SHOW_DATE - 1],
     'date',
@@ -3047,6 +3110,7 @@ function syncCRMRowStageToBase_(ctx, crmRowNumber) {
   );
   const logs = [];
   const oldStage = baseRow[APP.BASE_COLS.STAGE - 1];
+  const oldProfessor = baseRow[APP.BASE_COLS.PROFESSOR - 1];
   const oldShowDate = baseRow[APP.BASE_COLS.SHOW_DATE - 1];
   const oldNextFollowUp = baseRow[APP.BASE_COLS.NEXT_FOLLOWUP - 1];
 
@@ -3059,6 +3123,20 @@ function syncCRMRowStageToBase_(ctx, crmRowNumber) {
       field: 'Etapa / Status',
       oldValue: oldStage,
       newValue: newStage,
+      attendant: ctx.attendantName,
+      origin: APP.LOG_ORIGINS.CRM_UPDATE
+    }));
+  }
+
+  if (!areValuesEqualByType_(oldProfessor, newProfessor, 'text')) {
+    baseRow[APP.BASE_COLS.PROFESSOR - 1] = newProfessor;
+    logs.push(makeLogRow_({
+      action: APP.LOG_ACTIONS.UPDATE_FIELD,
+      id: id,
+      name: String(baseRow[APP.BASE_COLS.NAME - 1] || ''),
+      field: 'Professor',
+      oldValue: oldProfessor,
+      newValue: newProfessor,
       attendant: ctx.attendantName,
       origin: APP.LOG_ORIGINS.CRM_UPDATE
     }));
@@ -3094,7 +3172,11 @@ function syncCRMRowStageToBase_(ctx, crmRowNumber) {
 
   if (!logs.length) return;
 
-  baseRow[APP.BASE_COLS.LAST_INTERACTION - 1] = new Date();
+  const now = new Date();
+  baseRow[APP.BASE_COLS.LAST_INTERACTION - 1] = now;
+  if (!areValuesEqualByType_(oldStage, newStage, 'text')) {
+    baseRow[APP.BASE_COLS.LAST_STAGE_CHANGE - 1] = now;
+  }
   baseRow[APP.BASE_COLS.ATTENDANT - 1] = ctx.attendantName;
 
   ctx.baseSheet
@@ -3123,7 +3205,7 @@ function syncCaptacaoRowToBase_(ctx, captacaoRowNumber, baseLookup, stageContext
   const newHandle = sanitizeInfluencerHandle_(captacaoRow[0]).trim();
   const newName = String(captacaoRow[1] || '').trim();
   const newEmail = String(captacaoRow[2] || '').trim();
-  const newSource = String(captacaoRow[5] || '').trim();
+  const newSource = String(captacaoRow[APP.CAPTACAO_COLS.SOURCE - APP.CAPTACAO_COLS.HANDLE] || '').trim();
   const newStage = stageContext
     ? (stageContext.moveToCRM ? APP.DEFAULT_CRM_STAGE : stageContext.storedStage)
     : oldStage;
@@ -3257,6 +3339,9 @@ function syncCaptacaoRowToBase_(ctx, captacaoRowNumber, baseLookup, stageContext
   }
 
   baseRow[APP.BASE_COLS.LAST_INTERACTION - 1] = now;
+  if (stageContext && !areValuesEqualByType_(oldStage, newStage, 'text')) {
+    baseRow[APP.BASE_COLS.LAST_STAGE_CHANGE - 1] = now;
+  }
   baseRow[APP.BASE_COLS.ATTENDANT - 1] = ctx.attendantName;
 
   ctx.baseSheet
@@ -3338,6 +3423,7 @@ function recordFromBaseRow_(row) {
     stage: String(row[APP.BASE_COLS.STAGE - 1] || '').trim(),
     attendant: String(row[APP.BASE_COLS.ATTENDANT - 1] || '').trim(),
     lastInteraction: row[APP.BASE_COLS.LAST_INTERACTION - 1],
+    lastStageChange: row[APP.BASE_COLS.LAST_STAGE_CHANGE - 1],
     showDate: row[APP.BASE_COLS.SHOW_DATE - 1],
     nextFollowUp: row[APP.BASE_COLS.NEXT_FOLLOWUP - 1],
     obs: String(row[APP.BASE_COLS.OBS - 1] || '').trim(),
@@ -3645,6 +3731,81 @@ function replaceBaseRowsInSheet_(sheet, rows) {
   }
 }
 
+function buildAuditTimestampLookups_(logRows) {
+  const createdById = {};
+  const lastStageChangeById = {};
+
+  (logRows || []).forEach(function (row) {
+    const timestamp = row[0];
+    const action = String(row[1] || '').trim();
+    const id = String(row[2] || '').trim();
+
+    if (!id || !(timestamp instanceof Date)) return;
+
+    if (action === APP.LOG_ACTIONS.CREATE && !createdById[id]) {
+      createdById[id] = timestamp;
+    }
+
+    if (action === APP.LOG_ACTIONS.UPDATE_STAGE) {
+      if (!lastStageChangeById[id] || timestamp > lastStageChangeById[id]) {
+        lastStageChangeById[id] = timestamp;
+      }
+    }
+  });
+
+  return {
+    createdById: createdById,
+    lastStageChangeById: lastStageChangeById
+  };
+}
+
+function ensureBaseAuditDataForSheet_(sheet, auditLookups) {
+  if (!sheet) return;
+
+  sheet.getRange(1, 1, 1, APP.BASE_HEADERS.length).setValues([APP.BASE_HEADERS]);
+  sheet.getRange('B:B').setNumberFormat('dd/MM/yyyy HH:mm:ss');
+  sheet.getRange('I:I').setNumberFormat('dd/MM/yyyy HH:mm:ss');
+  sheet.getRange('Z:Z').setNumberFormat('dd/MM/yyyy HH:mm:ss');
+
+  const rows = getSheetDataRows_(sheet, APP.BASE_HEADERS.length);
+  if (!rows.length) return;
+
+  let changed = false;
+
+  rows.forEach(function (row) {
+    const id = String(row[APP.BASE_COLS.ID - 1] || '').trim();
+    if (!id) return;
+
+    if (isBlank_(row[APP.BASE_COLS.ENTRY_TIMESTAMP - 1])) {
+      row[APP.BASE_COLS.ENTRY_TIMESTAMP - 1] =
+        auditLookups.createdById[id] ||
+        row[APP.BASE_COLS.LAST_INTERACTION - 1] ||
+        new Date();
+      changed = true;
+    }
+
+    if (isBlank_(row[APP.BASE_COLS.LAST_STAGE_CHANGE - 1])) {
+      row[APP.BASE_COLS.LAST_STAGE_CHANGE - 1] =
+        auditLookups.lastStageChangeById[id] ||
+        row[APP.BASE_COLS.LAST_INTERACTION - 1] ||
+        row[APP.BASE_COLS.ENTRY_TIMESTAMP - 1];
+      changed = true;
+    }
+  });
+
+  if (changed) {
+    sheet.getRange(2, 1, rows.length, APP.BASE_HEADERS.length).setValues(rows);
+  }
+}
+
+function ensureBaseAuditData_(ctx) {
+  const logRows = getSheetDataRows_(ctx.logSheet, APP.LOG_HEADERS.length);
+  const auditLookups = buildAuditTimestampLookups_(logRows);
+
+  ensureBaseAuditDataForSheet_(ctx.baseSheet, auditLookups);
+  ensureBaseAuditDataForSheet_(ctx.databaseSheet, auditLookups);
+}
+
 function seedSyncBufferFromExistingSources_(ss, syncBufferSheet, databaseSheet, legacySheet) {
   const syncRows = getSheetDataRows_(syncBufferSheet, APP.BASE_HEADERS.length);
   if (syncRows.length) {
@@ -3912,6 +4073,51 @@ function getNonEmptyValuesFromColumn_(sheet, colNumber, startRow) {
     .filter(function (value) { return value !== ''; });
 }
 
+function getProfessorOptions_(legendSheet) {
+  const integration = APP.INTEGRATIONS.PROFESSORS;
+  let values = [];
+
+  if (integration && integration.ENABLED) {
+    try {
+      const externalSpreadsheet = SpreadsheetApp.openById(integration.SPREADSHEET_ID);
+      const professorSheet = externalSpreadsheet.getSheetByName(integration.SHEET_NAME);
+
+      if (professorSheet) {
+        const lastRow = professorSheet.getLastRow();
+        const lastColumn = professorSheet.getLastColumn();
+
+        if (lastRow >= 2 && lastColumn >= 1) {
+          const headerValues = professorSheet.getRange(1, 1, 1, lastColumn).getDisplayValues()[0];
+          let nameColumn = 1;
+
+          for (let idx = 0; idx < headerValues.length; idx += 1) {
+            const normalizedHeader = normalizeText_(headerValues[idx]);
+            if (normalizedHeader.indexOf('professor') >= 0 || normalizedHeader === normalizeText_('Nome')) {
+              nameColumn = idx + 1;
+              break;
+            }
+          }
+
+          values = getNonEmptyValuesFromColumn_(professorSheet, nameColumn, 2);
+        }
+      }
+    } catch (error) {
+      console.warn('Não foi possível carregar a lista externa de professores.', error);
+    }
+  }
+
+  if (!values.length) {
+    values = getNonEmptyValuesFromColumn_(legendSheet, 15, 2); // O
+  }
+
+  return values.filter(function (value, index, list) {
+    const normalizedValue = normalizeText_(value);
+    return normalizedValue && list.findIndex(function (candidate) {
+      return normalizeText_(candidate) === normalizedValue;
+    }) === index;
+  });
+}
+
 function clearSheetBody_(sheet, numCols, startRow, startCol) {
   const firstDataRow = startRow || 2;
   const firstDataCol = startCol || 1;
@@ -3938,7 +4144,12 @@ function getCaptacaoInputLastRow_(captacaoSheet) {
 function getCaptacaoInputRange_(captacaoSheet) {
   const startRow = APP.CAPTACAO_LAYOUT.INPUT_START_ROW;
   const totalRows = Math.max(getCaptacaoInputLastRow_(captacaoSheet) - startRow + 1, 1);
-  return captacaoSheet.getRange(startRow, APP.CAPTACAO_LAYOUT.INPUT_HANDLE_COLUMN, totalRows, 2);
+  return captacaoSheet.getRange(
+    startRow,
+    APP.CAPTACAO_LAYOUT.INPUT_HANDLE_COLUMN,
+    totalRows,
+    APP.CAPTACAO_LAYOUT.INPUT_WIDTH
+  );
 }
 
 function getCaptacaoApprovalRange_(captacaoSheet) {
@@ -4101,6 +4312,8 @@ function reconfigureCaptacaoPreservingPending_(ctx) {
 }
 
 function ensureOperationalLayouts_(ctx) {
+  ensureBaseAuditData_(ctx);
+
   const crmHeader = normalizeText_(ctx.crmSheet.getRange(APP.CRM_LAYOUT.HEADER_ROW, 1).getDisplayValue());
   if (crmHeader !== normalizeText_(APP.CRM_HEADERS[0])) {
     configurarCRM_(ctx.crmSheet);
@@ -4108,20 +4321,34 @@ function ensureOperationalLayouts_(ctx) {
 
   const captacaoTitle = normalizeText_(ctx.captacaoSheet.getRange('A1').getDisplayValue());
   const captacaoInputHeader = normalizeText_(ctx.captacaoSheet.getRange('A4').getDisplayValue());
-  const captacaoTableHeader = normalizeText_(ctx.captacaoSheet.getRange('D3').getDisplayValue());
-  const captacaoPhoneHeader = normalizeText_(ctx.captacaoSheet.getRange('G3').getDisplayValue());
-  const captacaoInstagramHeader = normalizeText_(ctx.captacaoSheet.getRange('H3').getDisplayValue());
-  const captacaoCommentsHeader = normalizeText_(ctx.captacaoSheet.getRange('I3').getDisplayValue());
+  const captacaoInputNameHeader = normalizeText_(ctx.captacaoSheet.getRange('B4').getDisplayValue());
+  const captacaoInputEmailHeader = normalizeText_(ctx.captacaoSheet.getRange('C4').getDisplayValue());
+  const captacaoInputApprovalHeader = normalizeText_(ctx.captacaoSheet.getRange('D4').getDisplayValue());
+  const captacaoTableHeader = normalizeText_(ctx.captacaoSheet.getRange('F3').getDisplayValue());
+  const captacaoPhoneHeader = normalizeText_(ctx.captacaoSheet.getRange('I3').getDisplayValue());
+  const captacaoInstagramHeader = normalizeText_(ctx.captacaoSheet.getRange('J3').getDisplayValue());
+  const captacaoCommentsHeader = normalizeText_(ctx.captacaoSheet.getRange('K3').getDisplayValue());
+  const captacaoSourceHeader = normalizeText_(ctx.captacaoSheet.getRange('M3').getDisplayValue());
+  const captacaoMessageHeader = normalizeText_(ctx.captacaoSheet.getRange('N3').getDisplayValue());
 
   if (
     captacaoTitle !== normalizeText_('Influencers captados esse mês') ||
     captacaoInputHeader !== normalizeText_('@') ||
+    captacaoInputNameHeader !== normalizeText_('Nome') ||
+    captacaoInputEmailHeader !== normalizeText_('Email') ||
+    captacaoInputApprovalHeader !== normalizeText_('Aprovação') ||
     captacaoTableHeader !== normalizeText_('@') ||
     captacaoPhoneHeader !== normalizeText_('Telefone') ||
     captacaoInstagramHeader !== normalizeText_('Link do instagram') ||
-    captacaoCommentsHeader !== normalizeText_('Comentários')
+    captacaoCommentsHeader !== normalizeText_('Comentários') ||
+    captacaoSourceHeader !== normalizeText_('Fonte Do Influencer') ||
+    captacaoMessageHeader !== normalizeText_('Instruções')
   ) {
     reconfigureCaptacaoPreservingPending_(ctx);
+  } else {
+    ctx.captacaoSheet.showColumns(APP.CAPTACAO_COLS.SOURCE);
+    ctx.captacaoSheet.hideColumns(APP.CAPTACAO_COLS.MESSAGE);
+    ctx.captacaoSheet.hideColumns(APP.CAPTACAO_COLS.ID);
   }
 }
 
@@ -4350,9 +4577,9 @@ function updateCaptacaoSummaries_(ctx, baseRows) {
   const fechadoCount = countUniqueStageEventsInMonth_(logRows, cohort.cohortById, 'Fechado');
 
   captacaoSheet.getRange('A2').setValue(totalAdded);
-  captacaoSheet.getRange('D2').setValue(sentToCRMCount);
-  captacaoSheet.getRange('F2').setValue(totalAdded ? aulaShowCount / totalAdded : 0).setNumberFormat('0.00%');
-  captacaoSheet.getRange('H2').setValue(totalAdded ? fechadoCount / totalAdded : 0).setNumberFormat('0.00%');
+  captacaoSheet.getRange('F2').setValue(sentToCRMCount);
+  captacaoSheet.getRange('H2').setValue(totalAdded ? aulaShowCount / totalAdded : 0).setNumberFormat('0.00%');
+  captacaoSheet.getRange('J2').setValue(totalAdded ? fechadoCount / totalAdded : 0).setNumberFormat('0.00%');
 }
 
 function getCRMStage_(record) {
