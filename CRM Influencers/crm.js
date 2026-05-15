@@ -428,6 +428,14 @@ function getClientActionRegistry_() {
       showInMenu: false,
       menuSeparatorBefore: false,
       handler: montarBancoDeDados
+    },
+    {
+      slot: 'crmAcao10',
+      actionName: 'atualizarListaProfessores',
+      label: 'Atualizar Lista de Professores',
+      showInMenu: true,
+      menuSeparatorBefore: true,
+      handler: atualizarListaProfessores
     }
   ];
 }
@@ -884,10 +892,28 @@ function atualizacaoAutomaticaDiaria() {
   try {
     runWithDocumentLock_(function () {
       const ctx = getContext_({ createMissing: false });
+      sincronizarListaProfessores_Interno_(ctx.legendSheet, ctx.crmSheet);
       refreshOperationalViews_(ctx, { silent: true, preservePending: true });
     });
   } catch (error) {
     console.error('Erro na atualização automática diária.', error);
+  }
+}
+
+function atualizarListaProfessores() {
+  try {
+    runWithDocumentLock_(function () {
+      const ctx = getContext_({ createMissing: false });
+      const totalProfessors = sincronizarListaProfessores_Interno_(ctx.legendSheet, ctx.crmSheet);
+
+      showToastMessage_(
+        'Lista de professores atualizada com sucesso.\n\nTotal de nomes: ' + totalProfessors,
+        'Automações CRM',
+        8
+      );
+    });
+  } catch (error) {
+    handleError_('atualizarListaProfessores', error);
   }
 }
 
@@ -4133,6 +4159,22 @@ function getProfessorOptionsRange_(legendSheet) {
 
   writeVerticalList_(legendSheet, 2, 15, professorOptions); // O2:O
   return legendSheet.getRange(2, 15, professorOptions.length, 1);
+}
+
+function sincronizarListaProfessores_Interno_(legendSheet, crmSheet) {
+  const professorOptions = getProfessorOptions_(legendSheet);
+
+  if (!professorOptions.length) {
+    throw new Error('Nenhum professor foi encontrado para atualizar a lista.');
+  }
+
+  writeVerticalList_(legendSheet, 2, 15, professorOptions); // O2:O
+
+  if (crmSheet) {
+    reaplicarValidacoesCRM_Interno_(crmSheet, legendSheet);
+  }
+
+  return professorOptions.length;
 }
 
 function clearSheetBody_(sheet, numCols, startRow, startCol) {
