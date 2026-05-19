@@ -1,6 +1,6 @@
 /****************************************************
  * DATABASE CENTRAL DE INFLUENCERS
- * Arquivo novo para consolidar bases de gestores/clientes.
+ * Arquivo novo para consolidar bases de advisors/gestores.
  ****************************************************/
 
 const CENTRAL_INFLUENCER_DB = Object.freeze({
@@ -11,23 +11,30 @@ const CENTRAL_INFLUENCER_DB = Object.freeze({
   MENU_NAME: 'Database Influencers',
   HTML_FILE: 'dashboard-influencers-central',
   DEFAULT_SOURCE_SHEET: 'Banco De Dados',
+  TAG_LEGEND_SHEET: 'Legenda de tags',
   CREATE_SPREADSHEET_ACTION: 'Criar planilha',
-  MANAGER_EMAILS: Object.freeze({
+  ONBOARDING_VIDEO_URL: 'https://drive.google.com/file/d/1K9GPuOfs2d551dHl0TP_8WVznDiOuyRc/view?usp=sharing',
+  ADVISOR_EMAILS: Object.freeze({
     Vini: 'viniciusnogueira.self@gmail.com',
     Victor: 'victorhltg@gmail.com',
     'Ju Miele': 'julianamiele.ii@gmail.com'
   }),
   SHEETS: Object.freeze({
-    MANAGERS: 'DB_Config_Gestores',
+    MANAGERS: 'DB_Config_Advisors',
     SOURCES: 'DB_Config_Planilhas',
     DATABASE: 'DB_Influencers',
-    CLIENTS: 'DB_Clientes',
+    CLIENTS: 'DB_Gestores',
     LOG: 'DB_Historico_Atualizacoes',
     DASHBOARD: 'DB_Dashboard'
   }),
+  LEGACY_SHEETS: Object.freeze({
+    MANAGERS: 'DB_Config_Gestores',
+    CLIENTS: 'DB_Clientes'
+  }),
   MANAGER_HEADERS: Object.freeze([
-    'Cliente',
     'Gestor',
+    'Advisor',
+    'Email',
     'Ativo',
     'Status',
     'Spreadsheet ID',
@@ -36,8 +43,8 @@ const CENTRAL_INFLUENCER_DB = Object.freeze({
     'Observacoes'
   ]),
   SOURCE_HEADERS: Object.freeze([
-    'Cliente',
     'Gestor',
+    'Advisor',
     'Spreadsheet ID ou URL',
     'Aba Origem',
     'Tipo Base',
@@ -49,8 +56,8 @@ const CENTRAL_INFLUENCER_DB = Object.freeze({
   ]),
   DATABASE_HEADERS: Object.freeze([
     'Database ID',
-    'Cliente',
     'Gestor',
+    'Advisor',
     'Fonte Spreadsheet ID',
     'Fonte Spreadsheet Name',
     'Fonte Sheet',
@@ -82,8 +89,8 @@ const CENTRAL_INFLUENCER_DB = Object.freeze({
     'Atualizado Em'
   ]),
   CLIENT_HEADERS: Object.freeze([
-    'Cliente',
     'Gestor',
+    'Advisor',
     'Planilhas',
     'Influencers',
     'Ativos',
@@ -102,8 +109,8 @@ const CENTRAL_INFLUENCER_DB = Object.freeze({
   LOG_HEADERS: Object.freeze([
     'Timestamp',
     'Acao',
+    'Advisor',
     'Gestor',
-    'Cliente',
     'Spreadsheet ID',
     'Linhas',
     'Status',
@@ -215,8 +222,8 @@ function atualizarDatabaseCentralInfluencers() {
 
     activeSources.forEach(function (source) {
       const sourceRowNumber = Number(source.__rowNumber);
-      const clientName = String(source['Cliente'] || '').trim();
-      const managerName = String(source['Gestor'] || '').trim();
+      const clientName = String(source['Gestor'] || '').trim();
+      const managerName = String(source['Advisor'] || '').trim();
       const sourceInput = String(source['Spreadsheet ID ou URL'] || '').trim();
       const sheetName = String(source['Aba Origem'] || '').trim() || CENTRAL_INFLUENCER_DB.DEFAULT_SOURCE_SHEET;
       const sourceId = cid_parseSpreadsheetId_(sourceInput);
@@ -287,7 +294,7 @@ function atualizarDatabaseCentralInfluencers() {
       importedRows: sortedRows.length,
       clients: clientRows.length,
       creationSummary: creationSummary,
-      message: 'Atualizacao concluida: ' + sortedRows.length + ' influencers em ' + clientRows.length + ' clientes.'
+      message: 'Atualizacao concluida: ' + sortedRows.length + ' influencers em ' + clientRows.length + ' gestores.'
     };
     cid_showUpdateAlert_(result);
     return result;
@@ -332,17 +339,50 @@ function cid_getCentralSpreadsheet_() {
 
 function cid_ensureAllSheets_(ss) {
   return {
-    managers: cid_ensureSheet_(ss, CENTRAL_INFLUENCER_DB.SHEETS.MANAGERS, CENTRAL_INFLUENCER_DB.MANAGER_HEADERS),
+    managers: cid_ensureManagerConfigSheet_(ss),
     sources: cid_ensureSheet_(ss, CENTRAL_INFLUENCER_DB.SHEETS.SOURCES, CENTRAL_INFLUENCER_DB.SOURCE_HEADERS),
     database: cid_ensureSheet_(ss, CENTRAL_INFLUENCER_DB.SHEETS.DATABASE, CENTRAL_INFLUENCER_DB.DATABASE_HEADERS),
-    clients: cid_ensureSheet_(ss, CENTRAL_INFLUENCER_DB.SHEETS.CLIENTS, CENTRAL_INFLUENCER_DB.CLIENT_HEADERS),
+    clients: cid_ensureSheet_(ss, CENTRAL_INFLUENCER_DB.SHEETS.CLIENTS, CENTRAL_INFLUENCER_DB.CLIENT_HEADERS, CENTRAL_INFLUENCER_DB.LEGACY_SHEETS.CLIENTS),
     log: cid_ensureSheet_(ss, CENTRAL_INFLUENCER_DB.SHEETS.LOG, CENTRAL_INFLUENCER_DB.LOG_HEADERS),
     dashboard: cid_ensureSheet_(ss, CENTRAL_INFLUENCER_DB.SHEETS.DASHBOARD, ['Database Central de Influencers'])
   };
 }
 
-function cid_ensureSheet_(ss, name, headers) {
+function cid_ensureManagerConfigSheet_(ss) {
+  let sheet = ss.getSheetByName(CENTRAL_INFLUENCER_DB.SHEETS.MANAGERS);
+  if (!sheet) {
+    sheet = ss.getSheetByName(CENTRAL_INFLUENCER_DB.LEGACY_SHEETS.MANAGERS);
+    if (sheet) {
+      sheet.setName(CENTRAL_INFLUENCER_DB.SHEETS.MANAGERS);
+    }
+  }
+  if (!sheet) {
+    sheet = ss.insertSheet(CENTRAL_INFLUENCER_DB.SHEETS.MANAGERS);
+  }
+
+  cid_migrateManagerConfigEmailColumn_(sheet);
+  return cid_ensureSheet_(ss, CENTRAL_INFLUENCER_DB.SHEETS.MANAGERS, CENTRAL_INFLUENCER_DB.MANAGER_HEADERS);
+}
+
+function cid_migrateManagerConfigEmailColumn_(sheet) {
+  const width = Math.min(sheet.getMaxColumns(), CENTRAL_INFLUENCER_DB.MANAGER_HEADERS.length);
+  const headers = sheet.getRange(1, 1, 1, width).getDisplayValues()[0].map(cid_norm_);
+  const hasEmail = headers.indexOf('email') >= 0;
+  const activeColumn = headers.indexOf('ativo') + 1;
+
+  if (!hasEmail && activeColumn === 3) {
+    sheet.insertColumnBefore(3);
+  }
+}
+
+function cid_ensureSheet_(ss, name, headers, legacyName) {
   let sheet = ss.getSheetByName(name);
+  if (!sheet && legacyName) {
+    sheet = ss.getSheetByName(legacyName);
+    if (sheet) {
+      sheet.setName(name);
+    }
+  }
   if (!sheet) {
     sheet = ss.insertSheet(name);
   }
@@ -376,18 +416,18 @@ function cid_formatConfigSheets_(sheets) {
     .setAllowInvalid(false)
     .build();
   const managerRule = SpreadsheetApp.newDataValidation()
-    .requireValueInList(Object.keys(CENTRAL_INFLUENCER_DB.MANAGER_EMAILS), true)
+    .requireValueInList(Object.keys(CENTRAL_INFLUENCER_DB.ADVISOR_EMAILS), true)
     .setAllowInvalid(false)
     .build();
 
   sheets.managers.getRange(2, 2, Math.max(sheets.managers.getMaxRows() - 1, 1), 1).setDataValidation(managerRule);
-  sheets.managers.getRange(2, 3, Math.max(sheets.managers.getMaxRows() - 1, 1), 1).setDataValidation(activeRule);
+  sheets.managers.getRange(2, 4, Math.max(sheets.managers.getMaxRows() - 1, 1), 1).setDataValidation(activeRule);
   sheets.sources.getRange(2, 6, Math.max(sheets.sources.getMaxRows() - 1, 1), 1).setDataValidation(sourceActiveRule);
-  sheets.managers.setColumnWidths(1, 8, 160);
+  sheets.managers.setColumnWidths(1, 9, 160);
   sheets.sources.setColumnWidths(1, 10, 165);
 
-  sheets.managers.getRange('A1:H1').setNote('Preencha Cliente, Gestor e Ativo = Criar planilha. Ao atualizar, o sistema cria a planilha na pasta padrao e cadastra em DB_Config_Planilhas.');
-  sheets.sources.getRange('A1:J1').setNote('Cada linha ativa e uma planilha/aba de cliente a ser importada para o DB_Influencers.');
+  sheets.managers.getRange('A1:I1').setNote('Preencha Gestor, Advisor, Email e Ativo = Criar planilha. Ao atualizar, o sistema cria a planilha na pasta padrao, concede acesso de edicao ao email informado e cadastra em DB_Config_Planilhas.');
+  sheets.sources.getRange('A1:J1').setNote('Cada linha ativa e uma planilha/aba de gestor a ser importada para o DB_Influencers.');
 }
 
 function cid_formatDataSheets_(sheets) {
@@ -415,7 +455,7 @@ function cid_writeDashboardShell_(sheet) {
     ['Use Database Influencers > Atualizar database para buscar planilhas novas e consolidar os dados.', ''],
     ['Configuracao principal:', CENTRAL_INFLUENCER_DB.SHEETS.MANAGERS + ' e ' + CENTRAL_INFLUENCER_DB.SHEETS.SOURCES],
     ['Base consolidada:', CENTRAL_INFLUENCER_DB.SHEETS.DATABASE],
-    ['Resumo por cliente:', CENTRAL_INFLUENCER_DB.SHEETS.CLIENTS]
+    ['Resumo por gestor:', CENTRAL_INFLUENCER_DB.SHEETS.CLIENTS]
   ];
   sheet.getRange(1, 1, values.length, 2).setValues(values);
   sheet.getRange(1, 1).setFontSize(18).setFontWeight('bold');
@@ -454,8 +494,9 @@ function cid_processPendingClientCreations_(sheets) {
 
   rows.forEach(function (row) {
     const rowNumber = Number(row.__rowNumber);
-    const clientName = String(row['Cliente'] || '').trim();
-    const managerName = String(row['Gestor'] || '').trim();
+    const clientName = String(row['Gestor'] || '').trim();
+    const managerName = String(row['Advisor'] || '').trim();
+    const editorEmail = String(row['Email'] || '').trim();
     const action = String(row['Ativo'] || '').trim();
 
     if (cid_norm_(action) !== cid_norm_(CENTRAL_INFLUENCER_DB.CREATE_SPREADSHEET_ACTION)) {
@@ -464,15 +505,20 @@ function cid_processPendingClientCreations_(sheets) {
 
     try {
       if (!clientName) {
-        throw new Error('Informe o cliente.');
+        throw new Error('Informe o gestor.');
       }
-      if (!CENTRAL_INFLUENCER_DB.MANAGER_EMAILS[managerName]) {
-        throw new Error('Gestor invalido. Use Vini, Victor ou Ju Miele.');
+      if (!CENTRAL_INFLUENCER_DB.ADVISOR_EMAILS[managerName]) {
+        throw new Error('Advisor invalido. Use Vini, Victor ou Ju Miele.');
+      }
+      if (!cid_isValidEmail_(editorEmail)) {
+        throw new Error('Informe um email valido para conceder acesso de edicao.');
       }
 
       const spreadsheetName = CENTRAL_INFLUENCER_DB.CLIENT_SPREADSHEET_PREFIX + clientName;
       const duplicateFile = cid_findSpreadsheetByNameInFolder_(folder, spreadsheetName);
       if (duplicateFile) {
+        const duplicateSpreadsheet = SpreadsheetApp.openById(duplicateFile.getId());
+        cid_writeGestorNameToTagLegend_(duplicateSpreadsheet, clientName);
         const duplicateMessage = 'Ja existe uma planilha com o nome "' + spreadsheetName + '". Nada foi criado.';
         cid_writeManagerCreationStatus_(sheets.managers, rowNumber, {
           status: duplicateMessage,
@@ -489,7 +535,18 @@ function cid_processPendingClientCreations_(sheets) {
         .getFileById(CENTRAL_INFLUENCER_DB.CLIENT_TEMPLATE_SPREADSHEET_ID)
         .makeCopy(spreadsheetName, folder);
       const spreadsheet = SpreadsheetApp.openById(spreadsheetFile.getId());
-      cid_seedClientSpreadsheet_(spreadsheet);
+      cid_seedClientSpreadsheet_(spreadsheet, clientName);
+      spreadsheetFile.addEditor(editorEmail);
+      const emailSummary = cid_sendSpreadsheetCreatedEmail_({
+        to: editorEmail,
+        gestor: clientName,
+        advisor: managerName,
+        spreadsheetName: spreadsheetName,
+        spreadsheetUrl: spreadsheet.getUrl()
+      });
+      if (emailSummary.warning) {
+        summary.warnings.push(emailSummary.warning);
+      }
 
       if (!knownSourceIds[spreadsheet.getId()]) {
         rowsToAppend.push([
@@ -497,7 +554,7 @@ function cid_processPendingClientCreations_(sheets) {
           managerName,
           spreadsheet.getId(),
           CENTRAL_INFLUENCER_DB.DEFAULT_SOURCE_SHEET,
-          'Cliente',
+          'Gestor',
           'Sim',
           '',
           '',
@@ -535,14 +592,61 @@ function cid_processPendingClientCreations_(sheets) {
 
 function cid_writeManagerCreationStatus_(sheet, rowNumber, status) {
   const rowValues = [
-    status.active || sheet.getRange(rowNumber, 3).getValue(),
+    status.active || sheet.getRange(rowNumber, 4).getValue(),
     status.status || '',
     status.spreadsheetId || '',
     status.url || '',
     status.updatedAt || new Date(),
     status.notes || ''
   ];
-  sheet.getRange(rowNumber, 3, 1, 6).setValues([rowValues]);
+  sheet.getRange(rowNumber, 4, 1, 6).setValues([rowValues]);
+}
+
+function cid_sendSpreadsheetCreatedEmail_(params) {
+  const videoUrl = String(CENTRAL_INFLUENCER_DB.ONBOARDING_VIDEO_URL || '').trim();
+  const subject = 'Sua planilha de parcerias foi criada';
+  const videoLine = videoUrl
+    ? 'Vídeo de orientação: ' + videoUrl
+    : 'Vídeo de orientação: o link será enviado em breve.';
+  const body = [
+    'Olá, ' + params.gestor,
+    '',
+    'Sua planilha foi criada e o acesso de edição já foi liberado.',
+    '',
+    'Gestor: ' + params.gestor,
+    'Planilha: ' + params.spreadsheetUrl,
+    videoLine,
+    '',
+    'Atenciosamente,',
+    'Equipe de Parcerias'
+  ].join('\n');
+  const htmlBody = [
+    '<p>Olá, ' + cid_escapeHtml_(params.gestor) + '</p>',
+    '<p>Sua planilha foi criada e o acesso de edição já foi liberado.</p>',
+    '<p>',
+    '<strong>Gestor:</strong> ' + cid_escapeHtml_(params.gestor) + '<br>',
+    '<strong>Planilha:</strong> <a href="' + cid_escapeHtml_(params.spreadsheetUrl) + '">' + cid_escapeHtml_(params.spreadsheetName) + '</a><br>',
+    videoUrl
+      ? '<strong>Vídeo de orientação:</strong> <a href="' + cid_escapeHtml_(videoUrl) + '">Assistir vídeo</a>'
+      : '<strong>Vídeo de orientação:</strong> o link será enviado em breve.',
+    '</p>',
+    '<p>Atenciosamente,<br>Equipe de Parcerias</p>'
+  ].join('');
+
+  try {
+    MailApp.sendEmail({
+      to: params.to,
+      subject: subject,
+      body: body,
+      htmlBody: htmlBody
+    });
+    return { sent: true };
+  } catch (error) {
+    return {
+      sent: false,
+      warning: 'Email nao enviado para ' + params.to + ': ' + error.message
+    };
+  }
 }
 
 function cid_findSpreadsheetByNameInFolder_(folder, spreadsheetName) {
@@ -556,7 +660,7 @@ function cid_findSpreadsheetByNameInFolder_(folder, spreadsheetName) {
   return null;
 }
 
-function cid_seedClientSpreadsheet_(spreadsheet) {
+function cid_seedClientSpreadsheet_(spreadsheet, gestorName) {
   let sheet = spreadsheet.getSheetByName(CENTRAL_INFLUENCER_DB.DEFAULT_SOURCE_SHEET);
   if (!sheet) {
     sheet = spreadsheet.getSheets()[0];
@@ -573,6 +677,16 @@ function cid_seedClientSpreadsheet_(spreadsheet) {
     .setBackground('#111827')
     .setFontColor('#ffffff')
     .setFontWeight('bold');
+
+  cid_writeGestorNameToTagLegend_(spreadsheet, gestorName);
+}
+
+function cid_writeGestorNameToTagLegend_(spreadsheet, gestorName) {
+  const legendSheet = spreadsheet.getSheetByName(CENTRAL_INFLUENCER_DB.TAG_LEGEND_SHEET);
+  if (legendSheet) {
+    legendSheet.getRange('A1').setValue(gestorName);
+    legendSheet.getRange('D1').setValue(gestorName);
+  }
 }
 
 function cid_readSourceSheet_(sheet) {
@@ -708,8 +822,8 @@ function cid_buildClientRows_(databaseRows, updatedAt) {
   const groups = {};
 
   databaseRows.forEach(function (row) {
-    const client = String(row[idx['Cliente']] || 'Sem cliente').trim() || 'Sem cliente';
-    const manager = String(row[idx['Gestor']] || 'Sem gestor').trim() || 'Sem gestor';
+    const client = String(row[idx['Gestor']] || 'Sem gestor').trim() || 'Sem gestor';
+    const manager = String(row[idx['Advisor']] || 'Sem advisor').trim() || 'Sem advisor';
     const key = client + '|' + manager;
 
     if (!groups[key]) {
@@ -980,11 +1094,11 @@ function cid_sheetToDisplayObjects_(sheet, headers) {
 function cid_buildManagerSummaryForDashboard_(clients) {
   const groups = {};
   clients.forEach(function (client) {
-    const manager = String(client['Gestor'] || 'Sem gestor').trim() || 'Sem gestor';
+    const manager = String(client['Advisor'] || 'Sem advisor').trim() || 'Sem advisor';
     if (!groups[manager]) {
       groups[manager] = {
-        Gestor: manager,
-        Clientes: 0,
+        Advisor: manager,
+        Gestores: 0,
         Influencers: 0,
         Ativos: 0,
         Atrasados: 0,
@@ -995,7 +1109,7 @@ function cid_buildManagerSummaryForDashboard_(clients) {
       };
     }
 
-    groups[manager].Clientes += 1;
+    groups[manager].Gestores += 1;
     groups[manager].Influencers += cid_toNumber_(client['Influencers']);
     groups[manager].Ativos += cid_toNumber_(client['Ativos']);
     groups[manager].Atrasados += cid_toNumber_(client['Atrasados']);
@@ -1062,7 +1176,7 @@ function cid_sortDatabaseRows_(rows) {
   const headers = CENTRAL_INFLUENCER_DB.DATABASE_HEADERS;
   const idx = cid_headerIndex_(headers);
   return rows.sort(function (a, b) {
-    const clientCompare = String(a[idx['Cliente']] || '').localeCompare(String(b[idx['Cliente']] || ''));
+    const clientCompare = String(a[idx['Gestor']] || '').localeCompare(String(b[idx['Gestor']] || ''));
     if (clientCompare) return clientCompare;
     return String(a[idx['@']] || '').localeCompare(String(b[idx['@']] || ''));
   });
@@ -1089,6 +1203,20 @@ function cid_pick_(rowObject, aliases) {
     }
   }
   return '';
+}
+
+function cid_isValidEmail_(value) {
+  const email = String(value || '').trim();
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function cid_escapeHtml_(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 function cid_parseSpreadsheetId_(value) {

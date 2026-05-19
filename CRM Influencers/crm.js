@@ -433,7 +433,7 @@ function getClientActionRegistry_() {
       slot: 'crmAcao10',
       actionName: 'atualizarListaProfessores',
       label: 'Atualizar Lista de Professores',
-      showInMenu: true,
+      showInMenu: false,
       menuSeparatorBefore: true,
       handler: atualizarListaProfessores
     }
@@ -1087,6 +1087,7 @@ function configurarEstruturaInicial() {
       configurarInfluencersAtivos_(ctx.activeInfluencersSheet);
       configurarLinksImportantes_(ctx.importantLinksSheet);
       configurarPendenciasRelacionamento_(ctx.relationshipPendingSheet);
+      hideSupportSheets_(ctx);
       reaplicarValidacoesCaptacao_Interno_(ctx.captacaoSheet);
       reaplicarValidacoesCRM_Interno_(ctx.crmSheet, ctx.legendSheet);
       reaplicarValidacoesBancoDeDados_Interno_(ctx.databaseSheet, ctx.legendSheet);
@@ -1430,6 +1431,34 @@ function configurarPendenciasRelacionamento_(sheet) {
   }
 
   sheet.getRange('J:J').setWrap(true);
+}
+
+function hideSupportSheets_(ctx) {
+  const fallbackSheet = ctx.crmSheet || ctx.captacaoSheet || ctx.databaseSheet;
+  [
+    ctx.legendSheet,
+    ctx.activeInfluencersSheet,
+    ctx.importantLinksSheet,
+    ctx.relationshipPendingSheet
+  ].forEach(function (sheet) {
+    hideSheetSafely_(ctx.ss, sheet, fallbackSheet);
+  });
+}
+
+function hideSheetSafely_(ss, sheet, fallbackSheet) {
+  if (!sheet || sheet.isSheetHidden()) {
+    return;
+  }
+
+  if (
+    fallbackSheet &&
+    fallbackSheet.getSheetId() !== sheet.getSheetId() &&
+    ss.getActiveSheet().getSheetId() === sheet.getSheetId()
+  ) {
+    ss.setActiveSheet(fallbackSheet);
+  }
+
+  sheet.hideSheet();
 }
 
 function reaplicarValidacoesCaptacao_Interno_(captacaoSheet) {
@@ -1953,18 +1982,31 @@ function getEmailAutomationConfigs_() {
       },
       buildHtml: function (ctx, record) {
         return (
-          'Oi ' + escapeHtml_(record.name) + ', tudo bem?<br><br>' +
-          'Há alguns dias entrei em contato com você, mas não obtive retorno. Eu sei, a nossa vida sempre está uma correria e talvez esse e-mail tenha passado em branco, mas realmente temos muito interesse em seu perfil.<br><br>' +
-          'Como comentado anteriormente, somos parte da Idioma Independente, uma comunidade online de professores particulares de idiomas e já atendemos mais de 5000 alunos particulares.<br><br>' +
-          'Gostei do seu trabalho no Instagram. Você gostaria de fazer publicidade com a gente?<br><br>' +
-          'Temos mais de 400 professores e já estamos com mais de 150 influencers como você na nossa equipe.<br><br>' +
-          'Dá uma olhada nessa campanha dos nossos influencers:<br><br>' +
-          'https://www.instagram.com/reel/C6CihQVLzo4/?igsh=MWFvcGZvMGg2cTZweQ==<br><br><br>' +
-          'Nosso objetivo é continuar crescendo e após analisarmos o seu Instagram acreditamos que você pode fazer parte disso com a gente. Posso mandar mais informações?<br><br><br>' +
-          'Obrigado,<br>' + escapeHtml_(ctx.recruiterName) + '<br><br>' +
-          'Apresentação sobre a parceria:<br>https://idiomaindependente.com.br/marketing-de-influencia/<br><br>' +
-          'Nosso Instagram:<br>https://www.instagram.com/idiomaindependente/<br><br>' +
-          'Nosso site:<br>https://idiomaindependente.com.br'
+          '<div style="font-family: Arial, sans-serif;">' +
+            '<p>Oi, ' + escapeHtml_(record.name) + '! Tudo bem?</p>' +
+            '<p>' +
+              'Imagino que sua rotina esteja corrida e meu e-mail anterior possa ter passado despercebido.' +
+            '</p>' +
+            '<p>' +
+              'Resolvi te escrever novamente porque gostei bastante do seu perfil e realmente acredito que ele pode ' +
+              'combinar com o formato das parcerias que construímos aqui na Idioma Independente.' +
+            '</p>' +
+            '<p>' +
+              'Para você visualizar um pouco melhor, deixo aqui uma das campanhas feitas com alguns dos nossos parceiros:<br>' +
+              '<a href="https://www.instagram.com/reel/C6CihQVLzo4/?igsh=MWFvcGZvMGg2cTZweQ==" target="_blank">' +
+                'https://www.instagram.com/reel/C6CihQVLzo4/?igsh=MWFvcGZvMGg2cTZweQ==' +
+              '</a>' +
+            '</p>' +
+            '<p>' +
+              'Você sente que faria sentido conversarmos melhor sobre essa possibilidade?' +
+            '</p>' +
+            '<p>' +
+              'Fico à disposição &#128522;' +
+            '</p>' +
+            '<p>' +
+              'Um abraço,<br>' + escapeHtml_(ctx.recruiterName) +
+            '</p>' +
+          '</div>'
         );
       }
     },
@@ -1979,12 +2021,28 @@ function getEmailAutomationConfigs_() {
       },
       buildHtml: function (ctx, record) {
         return (
-          'Oi ' + escapeHtml_(record.name) + ', tudo bem?<br><br>' +
-          'Passando por aqui uma última vez porque seguimos acreditando que o seu perfil combina com a nossa campanha de influencers da Idioma Independente.<br><br>' +
-          'Se fizer sentido para você, posso te explicar rapidamente como funciona a parceria e tirar qualquer dúvida por WhatsApp.<br><br>' +
-          'Se preferir, este é o material com as informações principais:<br>' +
-          '<a href="https://influ.idiomaindependente.com.br/" target="_blank">influ.idiomaindependente.com.br</a><br><br>' +
-          'Obrigada pelo seu tempo!<br>' + escapeHtml_(ctx.recruiterName)
+          '<div style="font-family: Arial, sans-serif;">' +
+            '<p>Oi, ' + escapeHtml_(record.name) + '! Tudo bem?</p>' +
+            '<p>' +
+              'Antes de encerrar esse contato, achei importante passar por aqui mais uma vez porque o seu perfil ' +
+              'realmente chamou atenção e parece estar alinhado com o tipo de parceria que estamos construindo.' +
+            '</p>' +
+            '<p>' +
+              'Acreditamos muito em parcerias genuínas e a longo prazo, e hoje já contamos com creators como ' +
+              'Isabella Lacerda (@isabellalacerda_nutri), Fernanda Concon (@fernandaconcon), ' +
+              'Ekaterina Puchkova (@katiusha_a_russa), além de outros 500 influencers parceiros.' +
+            '</p>' +
+            '<p>' +
+              'Também mantemos um índice de satisfação de 93 pontos de NPS entre mais de 7000 alunos, o que reforça ' +
+              'o cuidado que existe em cada experiência.' +
+            '</p>' +
+            '<p>' +
+              'Caso faça sentido para você conhecer melhor, fico à disposição para explicar com mais calma.' +
+            '</p>' +
+            '<p>' +
+              'Um abraço,<br>' + escapeHtml_(ctx.recruiterName) +
+            '</p>' +
+          '</div>'
         );
       }
     }
@@ -2153,6 +2211,12 @@ function finalizeRecordStageAutomation_(ctx, originalRow, workingRow, meta, issu
   const isCaptacaoPipeline = normalizeText_(record.currentPipeline) === normalizeText_(APP.PIPELINES.CAPTACAO);
   const stageChanged = !areValuesEqualByType_(originalRecord.stage, record.stage, 'text');
   const handleChanged = !areValuesEqualByType_(originalRecord.handle, record.handle, 'text');
+  const emailConfig = getEmailAutomationConfigForStage_(record.stage);
+  const shouldProcessPendingEmailStage = Boolean(
+    emailConfig &&
+    options.sendEmails &&
+    isBlank_(originalRow[emailConfig.sentAtCol - 1])
+  );
 
   if (handleChanged && handleSourceKey) {
     const handleResult = parseInfluencerHandleInput_(record.handle);
@@ -2167,7 +2231,7 @@ function finalizeRecordStageAutomation_(ctx, originalRow, workingRow, meta, issu
     }
   }
 
-  if (!stageChanged) {
+  if (!stageChanged && !shouldProcessPendingEmailStage) {
     return;
   }
 
@@ -2279,7 +2343,6 @@ function finalizeRecordStageAutomation_(ctx, originalRow, workingRow, meta, issu
     return;
   }
 
-  const emailConfig = getEmailAutomationConfigForStage_(record.stage);
   if (emailConfig && options.sendEmails) {
     if (!record.email) {
       issues.push('"' + (record.name || ('@' + record.handle) || record.id) + '" não tem email cadastrado no campo Email.');
@@ -3458,7 +3521,10 @@ function recordFromBaseRow_(row) {
     handle: String(row[APP.BASE_COLS.HANDLE - 1] || '').trim(),
     currentPipeline: String(row[APP.BASE_COLS.CURRENT_PIPELINE - 1] || '').trim(),
     recordOrigin: String(row[APP.BASE_COLS.RECORD_ORIGIN - 1] || '').trim(),
-    influencerSource: String(row[APP.BASE_COLS.INFLUENCER_SOURCE - 1] || '').trim()
+    influencerSource: String(row[APP.BASE_COLS.INFLUENCER_SOURCE - 1] || '').trim(),
+    email01SentAt: row[APP.BASE_COLS.EMAIL_01_SENT_AT - 1],
+    email02SentAt: row[APP.BASE_COLS.EMAIL_02_SENT_AT - 1],
+    email03SentAt: row[APP.BASE_COLS.EMAIL_03_SENT_AT - 1]
   };
 }
 
@@ -3536,15 +3602,27 @@ function getCaptacaoStage_(record) {
     return 'Fazer FUP';
   }
 
-  if (stageNormalized === normalizeText_('Enviar email 01') && !isFutureDate_(record.nextFollowUp)) {
+  if (
+    stageNormalized === normalizeText_('Enviar email 01') &&
+    !isBlank_(record.email01SentAt) &&
+    !isFutureDate_(record.nextFollowUp)
+  ) {
     return 'Email 1 respondido?';
   }
 
-  if (stageNormalized === normalizeText_('Enviar email 02') && !isFutureDate_(record.nextFollowUp)) {
+  if (
+    stageNormalized === normalizeText_('Enviar email 02') &&
+    !isBlank_(record.email02SentAt) &&
+    !isFutureDate_(record.nextFollowUp)
+  ) {
     return 'Email 2 respondido?';
   }
 
-  if (stageNormalized === normalizeText_('Enviar email 03') && !isFutureDate_(record.nextFollowUp)) {
+  if (
+    stageNormalized === normalizeText_('Enviar email 03') &&
+    !isBlank_(record.email03SentAt) &&
+    !isFutureDate_(record.nextFollowUp)
+  ) {
     return 'Decisão Final';
   }
 
@@ -3989,7 +4067,7 @@ function getContext_(options) {
     throw new Error('A aba "Pendências e Relacionamento" não existe. Rode primeiro a função "Configurar Estrutura Inicial".');
   }
 
-  return {
+  const ctx = {
     ss: ss,
     legendSheet: legendSheet,
     baseSheet: baseSheet,
@@ -4004,6 +4082,10 @@ function getContext_(options) {
     attendantName: attendantName,
     recruiterName: recruiterName
   };
+
+  hideSupportSheets_(ctx);
+
+  return ctx;
 }
 
 function runWithDocumentLock_(callback) {
@@ -4509,6 +4591,9 @@ function htmlToPlainText_(html) {
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
+    .replace(/&#(\d+);/g, function (_, code) {
+      return String.fromCodePoint(Number(code));
+    })
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }

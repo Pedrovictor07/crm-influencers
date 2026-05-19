@@ -370,13 +370,13 @@
     </section>
 
     <section class="section">
-      <h2 class="section-title">Gestores</h2>
+      <h2 class="section-title">Advisors</h2>
       <div class="panel">
         <table>
           <thead>
             <tr>
-              <th style="width: 38%">Gestor</th>
-              <th style="width: 17%">Clientes</th>
+              <th style="width: 38%">Advisor</th>
+              <th style="width: 17%">Gestores</th>
               <th style="width: 20%">Infl.</th>
               <th style="width: 25%">Score</th>
             </tr>
@@ -387,12 +387,12 @@
     </section>
 
     <section class="section">
-      <h2 class="section-title">Clientes em atencao</h2>
+      <h2 class="section-title">Gestores em atencao</h2>
       <div class="panel">
         <table>
           <thead>
             <tr>
-              <th style="width: 52%">Cliente</th>
+              <th style="width: 52%">Gestor</th>
               <th style="width: 23%">Saude</th>
               <th style="width: 25%">Score</th>
             </tr>
@@ -403,9 +403,9 @@
     </section>
 
     <section class="section">
-      <h2 class="section-title">Clientes</h2>
+      <h2 class="section-title">Gestores</h2>
       <div class="filters">
-        <input class="field" id="search" type="search" placeholder="Buscar cliente ou gestor" oninput="renderClients()">
+        <input class="field" id="search" type="search" placeholder="Buscar gestor ou advisor" oninput="renderClients()">
         <select class="field" id="healthFilter" onchange="renderClients()">
           <option value="">Todos</option>
           <option value="Forte">Forte</option>
@@ -418,7 +418,7 @@
         <table>
           <thead>
             <tr>
-              <th style="width: 48%">Cliente</th>
+              <th style="width: 48%">Gestor</th>
               <th style="width: 22%">Saude</th>
               <th style="width: 15%">Infl.</th>
               <th style="width: 15%">Score</th>
@@ -506,7 +506,7 @@
     function renderMetrics() {
       const metrics = state.data.metrics || {};
       const cards = [
-        ['Clientes', metrics.clients || 0, 'carteira central'],
+        ['Gestores', metrics.clients || 0, 'carteira central'],
         ['Influencers', metrics.influencers || 0, 'linhas consolidadas'],
         ['Score medio', metrics.score || 0, '0 a 100'],
         ['Atrasados', metrics.overdue || 0, 'follow-ups vencidos'],
@@ -546,23 +546,23 @@
       const rows = (state.data.managers || []).slice(0, 10);
       $('managerRows').innerHTML = rows.length ? rows.map(function (row) {
         return '<tr>' +
-          '<td><span class="client-name">' + escapeHtml(row.Gestor) + '</span><span class="sub">' + escapeHtml(row.Atrasados || 0) + ' atrasados · ' + escapeHtml(row.Concluidos || 0) + ' concluidos</span></td>' +
-          '<td>' + escapeHtml(row.Clientes || 0) + '</td>' +
+          '<td><span class="client-name">' + escapeHtml(row.Advisor) + '</span><span class="sub">' + escapeHtml(row.Atrasados || 0) + ' atrasados · ' + escapeHtml(row.Concluidos || 0) + ' concluidos</span></td>' +
+          '<td>' + escapeHtml(row.Gestores || 0) + '</td>' +
           '<td>' + escapeHtml(row.Influencers || 0) + '</td>' +
           '<td class="score">' + escapeHtml(row.Score || 0) + '</td>' +
         '</tr>';
-      }).join('') : '<tr><td colspan="4"><div class="empty">Sem gestores.</div></td></tr>';
+      }).join('') : '<tr><td colspan="4"><div class="empty">Sem advisors.</div></td></tr>';
     }
 
     function renderRiskRows() {
       const rows = (state.data.riskyClients || []).slice(0, 8);
       $('riskRows').innerHTML = rows.length ? rows.map(function (row) {
         return '<tr>' +
-          '<td><span class="client-name">' + escapeHtml(row.Cliente) + '</span><span class="sub">' + escapeHtml(row.Gestor) + ' · ' + escapeHtml(row['Principais Sinais']) + '</span></td>' +
+          '<td><span class="client-name">' + escapeHtml(row.Gestor) + '</span><span class="sub">' + escapeHtml(row.Advisor) + ' · ' + escapeHtml(row['Principais Sinais']) + '</span></td>' +
           '<td>' + pill(row.Saude) + '</td>' +
           '<td class="score">' + escapeHtml(row['Score Medio']) + '</td>' +
         '</tr>';
-      }).join('') : '<tr><td colspan="3"><div class="empty">Sem clientes em risco.</div></td></tr>';
+      }).join('') : '<tr><td colspan="3"><div class="empty">Sem gestores em risco.</div></td></tr>';
     }
 
     function renderClients() {
@@ -570,7 +570,7 @@
       const search = normalize($('search').value);
       const health = $('healthFilter').value;
       const rows = (state.data.clients || []).filter(function (row) {
-        const text = normalize(row.Cliente + ' ' + row.Gestor + ' ' + row.Saude);
+        const text = normalize(row.Gestor + ' ' + row.Advisor + ' ' + row.Saude);
         const matchesSearch = !search || text.indexOf(search) >= 0;
         const matchesHealth = !health || row.Saude === health;
         return matchesSearch && matchesHealth;
@@ -578,12 +578,12 @@
 
       $('clientRows').innerHTML = rows.length ? rows.map(function (row) {
         return '<tr>' +
-          '<td><span class="client-name">' + escapeHtml(row.Cliente) + '</span><span class="sub">' + escapeHtml(row.Gestor) + ' · ultima acao: ' + escapeHtml(row['Ultima Acao'] || '-') + '</span></td>' +
+          '<td><span class="client-name">' + escapeHtml(row.Gestor) + '</span><span class="sub">' + escapeHtml(row.Advisor) + ' · ultima acao: ' + escapeHtml(row['Ultima Acao'] || '-') + '</span></td>' +
           '<td>' + pill(row.Saude) + '</td>' +
           '<td>' + escapeHtml(row.Influencers || 0) + '</td>' +
           '<td class="score">' + escapeHtml(row['Score Medio'] || 0) + '</td>' +
         '</tr>';
-      }).join('') : '<tr><td colspan="4"><div class="empty">Nenhum cliente encontrado.</div></td></tr>';
+      }).join('') : '<tr><td colspan="4"><div class="empty">Nenhum gestor encontrado.</div></td></tr>';
     }
 
     function renderLogs() {
@@ -591,7 +591,7 @@
       $('logRows').innerHTML = rows.length ? rows.map(function (row) {
         return '<div class="log">' +
           '<strong>' + escapeHtml(row.Acao || 'Atualizacao') + ' · ' + escapeHtml(row.Status || '') + '</strong>' +
-          '<span>' + escapeHtml(row.Timestamp || '') + ' · ' + escapeHtml(row.Gestor || '-') + ' · ' + escapeHtml(row.Cliente || '-') + '</span>' +
+          '<span>' + escapeHtml(row.Timestamp || '') + ' · ' + escapeHtml(row.Advisor || '-') + ' · ' + escapeHtml(row.Gestor || '-') + '</span>' +
           '<span>' + escapeHtml(row.Detalhes || '') + '</span>' +
         '</div>';
       }).join('') : '<div class="empty">Sem historico.</div>';
