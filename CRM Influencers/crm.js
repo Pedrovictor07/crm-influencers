@@ -45,10 +45,11 @@ const APP = Object.freeze({
     INPUT_HANDLE_COLUMN: 1,
     INPUT_NAME_COLUMN: 2,
     INPUT_EMAIL_COLUMN: 3,
-    INPUT_APPROVAL_COLUMN: 4,
-    INPUT_WIDTH: 4,
-    DIVIDER_COLUMN: 5,
-    TABLE_START_COLUMN: 6
+    INPUT_PHONE_COLUMN: 4,
+    INPUT_APPROVAL_COLUMN: 5,
+    INPUT_WIDTH: 5,
+    DIVIDER_COLUMN: 6,
+    TABLE_START_COLUMN: 7
   }),
 
   // Cabeçalhos da base local do atendente
@@ -177,16 +178,16 @@ const APP = Object.freeze({
   }),
 
   CAPTACAO_COLS: Object.freeze({
-    HANDLE: 6,
-    NAME: 7,
-    EMAIL: 8,
-    PHONE: 9,
-    INSTAGRAM_LINK: 10,
-    COMMENTS: 11,
-    STAGE: 12,
-    SOURCE: 13,
-    MESSAGE: 14,
-    ID: 15
+    HANDLE: 7,
+    NAME: 8,
+    EMAIL: 9,
+    PHONE: 10,
+    INSTAGRAM_LINK: 11,
+    COMMENTS: 12,
+    STAGE: 13,
+    SOURCE: 14,
+    MESSAGE: 15,
+    ID: 16
   }),
 
   CRM_STAGES: Object.freeze([
@@ -197,6 +198,7 @@ const APP = Object.freeze({
     'Aula Show',
     'Matrícula',
     'Fechado',
+    'Ex-Influencer',
     'FUP + 03 dias',
     'FUP + 07 dias',
     'FUP + 14 dias',
@@ -216,6 +218,7 @@ const APP = Object.freeze({
 
   CRM_HIDDEN_STAGES: Object.freeze([
     'Fechado',
+    'Ex-Influencer',
     'Fez AS/Não fechou',
     'Agendou AS/Não fez',
     'RMKT',
@@ -250,6 +253,7 @@ const APP = Object.freeze({
     'Aula Show',
     'Matrícula',
     'Fechado',
+    'Ex-Influencer',
     'FUP + 03 dias',
     'FUP + 07 dias',
     'FUP + 14 dias',
@@ -1231,28 +1235,28 @@ function configurarCaptacao_(captacaoSheet) {
     .getRange(1, 1, captacaoSheet.getMaxRows(), APP.CAPTACAO_COLS.ID)
     .breakApart();
 
-  captacaoSheet.getRange('A1:D1').merge().setValue('Influencers captados esse mês');
-  captacaoSheet.getRange('A2:D2').merge();
-  captacaoSheet.getRange('A3:D3').merge().setValue('INSERIR NOVOS INFLUS ABAIXO');
-  captacaoSheet.getRange('A4:D4').setValues([['@', 'Nome', 'Email', 'Aprovação']]);
+  captacaoSheet.getRange('A1:E1').merge().setValue('Influencers captados esse mês');
+  captacaoSheet.getRange('A2:E2').merge();
+  captacaoSheet.getRange('A3:E3').merge().setValue('INSERIR NOVOS INFLUS ABAIXO');
+  captacaoSheet.getRange('A4:E4').setValues([['@', 'Nome', 'Email', 'Telefone', 'Aprovação']]);
 
-  captacaoSheet.getRange('F1:G1').merge().setValue('influs enviados para o CRM no mês');
-  captacaoSheet.getRange('H1:I1').merge().setValue('influs com AS agendada no mês');
-  captacaoSheet.getRange('J1:K1').merge().setValue('influs fechados no mês');
-  captacaoSheet.getRange('F2:G2').merge();
-  captacaoSheet.getRange('H2:I2').merge();
-  captacaoSheet.getRange('J2:K2').merge();
-  captacaoSheet.getRange('F2').clearContent();
-  captacaoSheet.getRange('H2').clearContent();
-  captacaoSheet.getRange('J2').clearContent();
+  captacaoSheet.getRange('G1:H1').merge().setValue('influs enviados para o CRM no mês');
+  captacaoSheet.getRange('I1:J1').merge().setValue('influs com AS agendada no mês');
+  captacaoSheet.getRange('K1:L1').merge().setValue('influs fechados no mês');
+  captacaoSheet.getRange('G2:H2').merge();
+  captacaoSheet.getRange('I2:J2').merge();
+  captacaoSheet.getRange('K2:L2').merge();
+  captacaoSheet.getRange('G2').clearContent();
+  captacaoSheet.getRange('I2').clearContent();
+  captacaoSheet.getRange('K2').clearContent();
   captacaoSheet
     .getRange(APP.CAPTACAO_LAYOUT.TABLE_HEADER_ROW, APP.CAPTACAO_LAYOUT.TABLE_START_COLUMN, 1, APP.CAPTACAO_HEADERS.length)
     .setValues([APP.CAPTACAO_HEADERS]);
 
-  captacaoSheet.getRange('A1:D4').setHorizontalAlignment('center');
-  captacaoSheet.getRange('F1:O3').setHorizontalAlignment('center');
-  captacaoSheet.getRange('A1:O3').setVerticalAlignment('middle');
-  captacaoSheet.getRange('A1:O3').setWrap(true);
+  captacaoSheet.getRange('A1:E4').setHorizontalAlignment('center');
+  captacaoSheet.getRange('G1:P3').setHorizontalAlignment('center');
+  captacaoSheet.getRange('A1:P3').setVerticalAlignment('middle');
+  captacaoSheet.getRange('A1:P3').setWrap(true);
   captacaoSheet
     .getRange(
       APP.CAPTACAO_LAYOUT.TABLE_DATA_START_ROW,
@@ -1263,22 +1267,22 @@ function configurarCaptacao_(captacaoSheet) {
     .setWrapStrategy(SpreadsheetApp.WrapStrategy.CLIP);
 
   captacaoSheet
-    .getRange('A1:D1')
+    .getRange('A1:E1')
     .setFontWeight('bold')
     .setBackground(HEADER_FILL_MAGENTA_LIGHT_3)
     .setFontColor(HEADER_TEXT_DARK);
-  captacaoSheet.getRange('A2:D3').setFontWeight('bold').setBackground('#f3f3f3');
+  captacaoSheet.getRange('A2:E3').setFontWeight('bold').setBackground('#f3f3f3');
   captacaoSheet
-    .getRange('A4:D4')
+    .getRange('A4:E4')
     .setFontWeight('bold')
     .setBackground(HEADER_FILL_YELLOW_LIGHT_2)
     .setFontColor(HEADER_TEXT_DARK);
   captacaoSheet
-    .getRange('F1:K1')
+    .getRange('G1:L1')
     .setFontWeight('bold')
     .setBackground(HEADER_FILL_MAGENTA_LIGHT_3)
     .setFontColor(HEADER_TEXT_DARK);
-  captacaoSheet.getRange('F2:K2').setFontWeight('bold').setBackground('#f3f3f3');
+  captacaoSheet.getRange('G2:L2').setFontWeight('bold').setBackground('#f3f3f3');
   captacaoSheet
     .getRange(APP.CAPTACAO_LAYOUT.TABLE_HEADER_ROW, APP.CAPTACAO_LAYOUT.TABLE_START_COLUMN, 1, APP.CAPTACAO_HEADERS.length)
     .setFontWeight('bold')
@@ -1291,12 +1295,12 @@ function configurarCaptacao_(captacaoSheet) {
   captacaoSheet.setFrozenRows(3);
 
   safeSetColumnWidths_(captacaoSheet, [
-    [1, 100], [2, 100], [3, 100], [4, 100], [5, 12], [6, 120], [7, 120], [8, 170], [9, 100], [10, 100], [11, 240], [12, 210], [13, 180], [14, 280], [15, 160]
+    [1, 100], [2, 100], [3, 100], [4, 100], [5, 100], [6, 12], [7, 120], [8, 120], [9, 170], [10, 100], [11, 100], [12, 240], [13, 210], [14, 180], [15, 280], [16, 160]
   ]);
 
   captacaoSheet.getRange(1, APP.CAPTACAO_LAYOUT.DIVIDER_COLUMN, captacaoSheet.getMaxRows(), 1).setBackground('#e6e6e6');
   captacaoSheet
-    .getRange(APP.CAPTACAO_LAYOUT.INPUT_START_ROW, APP.CAPTACAO_LAYOUT.INPUT_HANDLE_COLUMN, captacaoSheet.getMaxRows() - APP.CAPTACAO_LAYOUT.INPUT_START_ROW + 1, 3)
+    .getRange(APP.CAPTACAO_LAYOUT.INPUT_START_ROW, APP.CAPTACAO_LAYOUT.INPUT_HANDLE_COLUMN, captacaoSheet.getMaxRows() - APP.CAPTACAO_LAYOUT.INPUT_START_ROW + 1, 4)
     .setNumberFormat('@STRING@');
   captacaoSheet
     .getRange(APP.CAPTACAO_LAYOUT.TABLE_DATA_START_ROW, APP.CAPTACAO_COLS.HANDLE, captacaoSheet.getMaxRows() - APP.CAPTACAO_LAYOUT.TABLE_DATA_START_ROW + 1, 1)
@@ -1635,7 +1639,8 @@ function adicionarInflu() {
         const rawHandle = String(inputRow[0] || '').trim();
         const inputName = String(inputRow[1] || '').trim();
         const inputEmail = String(inputRow[2] || '').trim();
-        const approvalStatus = String(inputRow[3] || '').trim();
+        const inputPhone = String(inputRow[3] || '').trim();
+        const approvalStatus = String(inputRow[4] || '').trim();
         const approvalStatusNormalized = normalizeText_(approvalStatus);
 
         if (!rawHandle) {
@@ -1667,7 +1672,7 @@ function adicionarInflu() {
         row[APP.BASE_COLS.ID - 1] = influencerId;
         row[APP.BASE_COLS.ENTRY_TIMESTAMP - 1] = now;
         row[APP.BASE_COLS.NAME - 1] = inputName;
-        row[APP.BASE_COLS.PHONE - 1] = '';
+        row[APP.BASE_COLS.PHONE - 1] = inputPhone;
         row[APP.BASE_COLS.TAG - 1] = APP.DEFAULT_TAG;
         row[APP.BASE_COLS.STAGE - 1] = APP.DEFAULT_CAPTACAO_STAGE;
         row[APP.BASE_COLS.ATTENDANT - 1] = ctx.attendantName;
@@ -4464,19 +4469,21 @@ function ensureOperationalLayouts_(ctx) {
   const captacaoInputHeader = normalizeText_(ctx.captacaoSheet.getRange('A4').getDisplayValue());
   const captacaoInputNameHeader = normalizeText_(ctx.captacaoSheet.getRange('B4').getDisplayValue());
   const captacaoInputEmailHeader = normalizeText_(ctx.captacaoSheet.getRange('C4').getDisplayValue());
-  const captacaoInputApprovalHeader = normalizeText_(ctx.captacaoSheet.getRange('D4').getDisplayValue());
-  const captacaoTableHeader = normalizeText_(ctx.captacaoSheet.getRange('F3').getDisplayValue());
-  const captacaoPhoneHeader = normalizeText_(ctx.captacaoSheet.getRange('I3').getDisplayValue());
-  const captacaoInstagramHeader = normalizeText_(ctx.captacaoSheet.getRange('J3').getDisplayValue());
-  const captacaoCommentsHeader = normalizeText_(ctx.captacaoSheet.getRange('K3').getDisplayValue());
-  const captacaoSourceHeader = normalizeText_(ctx.captacaoSheet.getRange('M3').getDisplayValue());
-  const captacaoMessageHeader = normalizeText_(ctx.captacaoSheet.getRange('N3').getDisplayValue());
+  const captacaoInputPhoneHeader = normalizeText_(ctx.captacaoSheet.getRange('D4').getDisplayValue());
+  const captacaoInputApprovalHeader = normalizeText_(ctx.captacaoSheet.getRange('E4').getDisplayValue());
+  const captacaoTableHeader = normalizeText_(ctx.captacaoSheet.getRange('G3').getDisplayValue());
+  const captacaoPhoneHeader = normalizeText_(ctx.captacaoSheet.getRange('J3').getDisplayValue());
+  const captacaoInstagramHeader = normalizeText_(ctx.captacaoSheet.getRange('K3').getDisplayValue());
+  const captacaoCommentsHeader = normalizeText_(ctx.captacaoSheet.getRange('L3').getDisplayValue());
+  const captacaoSourceHeader = normalizeText_(ctx.captacaoSheet.getRange('N3').getDisplayValue());
+  const captacaoMessageHeader = normalizeText_(ctx.captacaoSheet.getRange('O3').getDisplayValue());
 
   if (
     captacaoTitle !== normalizeText_('Influencers captados esse mês') ||
     captacaoInputHeader !== normalizeText_('@') ||
     captacaoInputNameHeader !== normalizeText_('Nome') ||
     captacaoInputEmailHeader !== normalizeText_('Email') ||
+    captacaoInputPhoneHeader !== normalizeText_('Telefone') ||
     captacaoInputApprovalHeader !== normalizeText_('Aprovação') ||
     captacaoTableHeader !== normalizeText_('@') ||
     captacaoPhoneHeader !== normalizeText_('Telefone') ||
@@ -4721,9 +4728,9 @@ function updateCaptacaoSummaries_(ctx, baseRows) {
   const fechadoCount = countUniqueStageEventsInMonth_(logRows, cohort.cohortById, 'Fechado');
 
   captacaoSheet.getRange('A2').setValue(totalAdded);
-  captacaoSheet.getRange('F2').setValue(sentToCRMCount);
-  captacaoSheet.getRange('H2').setValue(totalAdded ? aulaShowCount / totalAdded : 0).setNumberFormat('0.00%');
-  captacaoSheet.getRange('J2').setValue(totalAdded ? fechadoCount / totalAdded : 0).setNumberFormat('0.00%');
+  captacaoSheet.getRange('G2').setValue(sentToCRMCount);
+  captacaoSheet.getRange('I2').setValue(totalAdded ? aulaShowCount / totalAdded : 0).setNumberFormat('0.00%');
+  captacaoSheet.getRange('K2').setValue(totalAdded ? fechadoCount / totalAdded : 0).setNumberFormat('0.00%');
 }
 
 function getCRMStage_(record) {
