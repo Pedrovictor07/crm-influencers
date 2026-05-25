@@ -357,6 +357,10 @@ const APP = Object.freeze({
   })
 });
 
+const EMAIL_AUTH_SCOPES = Object.freeze([
+  'https://mail.google.com/'
+]);
+
 /****************************************************
  * MENU.GS
  * Menu principal e wrappers para botões
@@ -567,10 +571,25 @@ function getCaptacaoSheetHeaderPosition_(headerValues, label, fallbackPosition) 
   return fallbackPosition;
 }
 
+function getCaptacaoTableStartColumn_(captacaoSheet) {
+  const headerValues = captacaoSheet
+    .getRange(APP.CAPTACAO_LAYOUT.TABLE_HEADER_ROW, 1, 1, captacaoSheet.getLastColumn())
+    .getDisplayValues()[0];
+
+  for (let idx = 0; idx < headerValues.length; idx += 1) {
+    if (normalizeText_(headerValues[idx]) === normalizeText_('@')) {
+      return idx + 1;
+    }
+  }
+
+  return APP.CAPTACAO_LAYOUT.TABLE_START_COLUMN;
+}
+
 function getCaptacaoSheetLayoutInfo_(captacaoSheet) {
   const width = APP.CAPTACAO_HEADERS.length;
+  const startCol = getCaptacaoTableStartColumn_(captacaoSheet);
   const headerValues = captacaoSheet
-    .getRange(APP.CAPTACAO_LAYOUT.TABLE_HEADER_ROW, APP.CAPTACAO_LAYOUT.TABLE_START_COLUMN, 1, width)
+    .getRange(APP.CAPTACAO_LAYOUT.TABLE_HEADER_ROW, startCol, 1, width)
     .getDisplayValues()[0];
 
   const positions = {
@@ -587,6 +606,7 @@ function getCaptacaoSheetLayoutInfo_(captacaoSheet) {
   };
 
   return {
+    startCol: startCol,
     width: width,
     idCol: positions.id,
     positions: positions,
@@ -761,7 +781,7 @@ function collectPendingEdits_(ctx, baseRows) {
   collectPendingEditsFromSheet_({
     sheet: ctx.captacaoSheet,
     startRow: APP.CAPTACAO_LAYOUT.TABLE_DATA_START_ROW,
-    startCol: APP.CAPTACAO_LAYOUT.TABLE_START_COLUMN,
+    startCol: captacaoLayoutInfo.startCol,
     width: captacaoLayoutInfo.width,
     idCol: captacaoLayoutInfo.idCol,
     sourceKey: 'captacao',
@@ -2208,6 +2228,10 @@ function sendAutomationEmailForRecord_(ctx, record, config) {
   GmailApp.sendEmail(record.email, subject, plainBody, sendOptions);
 }
 
+function requireEmailAuthorization_() {
+  ScriptApp.requireScopes(ScriptApp.AuthMode.FULL, EMAIL_AUTH_SCOPES);
+}
+
 function finalizeRecordStageAutomation_(ctx, originalRow, workingRow, meta, issues, counters, options) {
   const originalRecord = recordFromBaseRow_(originalRow);
   let record = recordFromBaseRow_(workingRow);
@@ -2378,6 +2402,8 @@ function finalizeRecordStageAutomation_(ctx, originalRow, workingRow, meta, issu
       revertStageRelatedFields_(workingRow, originalRow, meta);
       return;
     }
+
+    requireEmailAuthorization_();
 
     try {
       sendAutomationEmailForRecord_(ctx, record, emailConfig);
@@ -4728,7 +4754,7 @@ function updateCaptacaoSummaries_(ctx, baseRows) {
   const fechadoCount = countUniqueStageEventsInMonth_(logRows, cohort.cohortById, 'Fechado');
 
   captacaoSheet.getRange('A2').setValue(totalAdded);
-  captacaoSheet.getRange('G2').setValue(sentToCRMCount);
+  captacaoSheet.getRange('G2').setValue(totalAdded ? sentToCRMCount / totalAdded : 0).setNumberFormat('0.00%');
   captacaoSheet.getRange('I2').setValue(totalAdded ? aulaShowCount / totalAdded : 0).setNumberFormat('0.00%');
   captacaoSheet.getRange('K2').setValue(totalAdded ? fechadoCount / totalAdded : 0).setNumberFormat('0.00%');
 }

@@ -16,9 +16,10 @@
 3. Adicione a library publicada.
 4. Use o identificador `CRMCore`.
 5. Cole o conteudo de `template-cliente.js` no projeto da planilha cliente.
-6. Esse template ja inclui `30` slots fixos (`crmAcao01` ate `crmAcao30`) para futuras automacoes.
-7. Execute `configurarEstruturaInicial` uma vez para montar a estrutura inicial.
-8. Reabra a planilha para carregar o menu `Automacoes CRM`.
+6. Atualize o manifesto `appsscript.json` com os escopos OAuth e o servico avancado do Gmail mostrados no modelo deste diretorio, preservando a dependencia `CRMCore` criada no passo 3.
+7. Esse template ja inclui `30` slots fixos (`crmAcao01` ate `crmAcao30`) para futuras automacoes.
+8. Execute `configurarEstruturaInicial` uma vez para montar a estrutura inicial e autorizar os acessos solicitados.
+9. Reabra a planilha para carregar o menu `Automacoes CRM`.
 
 ## O que o cliente ve
 
@@ -35,6 +36,8 @@ Apps Script Library esconde o codigo principal, mas nao substitui permissoes de 
 Com a arquitetura atual, cada cliente provavelmente vai precisar autorizar:
 - Gmail, para enviar os emails pela propria conta.
 - Acesso as planilhas externas usadas nas integracoes.
+
+Quando a automacao tentar enviar um email pela primeira vez, ela confere a autorizacao do Gmail antes do envio. Caso a permissao ainda nao tenha sido concedida, o Apps Script interrompe a execucao e apresenta o pedido de consentimento; depois de autorizar, execute a atualizacao novamente.
 
 Hoje isso afeta especialmente a planilha externa:
 - ID: `1vKwoZ4XZIjH_Gmp1bIQdSPwnzwiClbVyJFtNTKCL1lI`
