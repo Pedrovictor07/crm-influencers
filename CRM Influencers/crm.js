@@ -842,11 +842,13 @@ function refreshOperationalViews_(ctx, options) {
   const preservePending = Boolean(options && options.preservePending);
   const silent = Boolean(options && options.silent);
   const target = (options && options.target) || 'all';
-  const committedRows = getSheetDataRows_(ctx.baseSheet, APP.BASE_HEADERS.length);
+  const committedRows = getNonEmptySheetDataRows_(ctx.baseSheet, APP.BASE_HEADERS.length);
+  if (!committedRows.length) {
+    console.warn('Atualizacao das visualizacoes ignorada: Banco De Dados nao possui registros para alimentar a operacao.');
+    return;
+  }
+
   const pendingById = preservePending ? collectPendingEdits_(ctx, committedRows) : {};
-  const databaseViewRows = preservePending
-    ? buildPreviewBaseRowsWithPendingEdits_(ctx, committedRows, pendingById, ['database'])
-    : committedRows;
   const crmViewRows = preservePending
     ? buildPreviewBaseRowsWithPendingEdits_(ctx, committedRows, pendingById, ['crm'])
     : committedRows;
@@ -861,14 +863,12 @@ function refreshOperationalViews_(ctx, options) {
   });
 
   if (target === 'captacao') {
-    montarBancoDeDados_Interno_(ctx, { silent: true, baseRowsOverride: databaseViewRows });
     refreshCRMView_Interno_(ctx, { silent: true, baseRowsOverride: crmViewRows, forceVisibleIds: crmPendingIds });
     montarCaptacao_Interno_(ctx, { silent: silent, baseRowsOverride: captacaoViewRows, forceVisibleIds: captacaoPendingIds });
     return;
   }
 
   if (target === 'crm') {
-    montarBancoDeDados_Interno_(ctx, { silent: true, baseRowsOverride: databaseViewRows });
     montarCaptacao_Interno_(ctx, { silent: true, baseRowsOverride: captacaoViewRows, forceVisibleIds: captacaoPendingIds });
     refreshCRMView_Interno_(ctx, { silent: silent, baseRowsOverride: crmViewRows, forceVisibleIds: crmPendingIds });
     return;
@@ -877,13 +877,12 @@ function refreshOperationalViews_(ctx, options) {
   if (target === 'database') {
     montarCaptacao_Interno_(ctx, { silent: true, baseRowsOverride: captacaoViewRows, forceVisibleIds: captacaoPendingIds });
     refreshCRMView_Interno_(ctx, { silent: true, baseRowsOverride: crmViewRows, forceVisibleIds: crmPendingIds });
-    montarBancoDeDados_Interno_(ctx, { silent: silent, baseRowsOverride: databaseViewRows });
+    montarBancoDeDados_Interno_(ctx, { silent: silent });
     return;
   }
 
   montarCaptacao_Interno_(ctx, { silent: true, baseRowsOverride: captacaoViewRows, forceVisibleIds: captacaoPendingIds });
   refreshCRMView_Interno_(ctx, { silent: true, baseRowsOverride: crmViewRows, forceVisibleIds: crmPendingIds });
-  montarBancoDeDados_Interno_(ctx, { silent: true, baseRowsOverride: databaseViewRows });
 }
 
 function refreshOperationalQueuesSilently_() {
@@ -999,7 +998,6 @@ function handleCRMEdit_(e) {
   syncCRMRowStageToBase_(ctx, rowNumber);
   montarCaptacao_Interno_(ctx, { silent: true });
   refreshCRMView_Interno_(ctx, { silent: true });
-  montarBancoDeDados_Interno_(ctx, { silent: true });
 }
 
 function handleCaptacaoEdit_(e) {
@@ -1034,7 +1032,6 @@ function handleCaptacaoEdit_(e) {
   syncCaptacaoRowToBase_(ctx, rowNumber, baseLookup, stageContext, typeof e.oldValue === 'undefined' ? '' : e.oldValue);
   montarCaptacao_Interno_(ctx, { silent: true });
   refreshCRMView_Interno_(ctx, { silent: true });
-  montarBancoDeDados_Interno_(ctx, { silent: true });
 }
 
 
@@ -1105,7 +1102,7 @@ function configurarEstruturaInicial() {
       configurarLegenda_(ctx.legendSheet, ctx.ss);
       configurarCaptacao_(ctx.captacaoSheet);
       configurarCRM_(ctx.crmSheet);
-      configurarSyncBuffer_(ctx.baseSheet);
+      configurarSyncBuffer_(ctx.syncBufferSheet);
       configurarBancoDeDados_(ctx.databaseSheet);
       configurarLog_(ctx.logSheet);
       configurarInfluencersAtivos_(ctx.activeInfluencersSheet);
@@ -1114,8 +1111,6 @@ function configurarEstruturaInicial() {
       hideSupportSheets_(ctx);
       reaplicarValidacoesCaptacao_Interno_(ctx.captacaoSheet);
       reaplicarValidacoesCRM_Interno_(ctx.crmSheet, ctx.legendSheet);
-      reaplicarValidacoesBancoDeDados_Interno_(ctx.databaseSheet, ctx.legendSheet);
-      montarBancoDeDados_Interno_(ctx, { silent: true });
       montarCaptacao_Interno_(ctx, { silent: true });
       refreshCRMView_Interno_(ctx, { silent: true });
       ensureDailyRefreshTrigger_();
@@ -1179,7 +1174,7 @@ function configurarLegenda_(legendSheet, ss) {
   legendSheet.getRange(APP.LEGEND_CELLS.ATTENDANT_NAME)
     .setNote('Nome oficial do atendente. Usado para logs e identificação da operação.');
   legendSheet.getRange(APP.LEGEND_CELLS.RECRUITER_NAME)
-    .setNote('Nome do recrutador usado nos e-mails enviados aos influencers.');
+    .setNote('Nome do gestor usado nos e-mails enviados aos influencers.');
   legendSheet.getRange(APP.LEGEND_CELLS.MODE)
     .setNote('Modo de funcionamento. Criado como placeholder para futuras evoluções.');
   legendSheet.getRange(APP.LEGEND_CELLS.ATTENDANT_PHONE)
@@ -1375,11 +1370,19 @@ function configurarSyncBuffer_(syncBufferSheet) {
 }
 
 function configurarBancoDeDados_(databaseSheet) {
+  const currentHeaders = databaseSheet.getRange(1, 1, 1, APP.BASE_HEADERS.length).getDisplayValues()[0];
+  const hasAnyHeader = currentHeaders.some(function (header) {
+    return String(header || '').trim() !== '';
+  });
+  const hasStoredRows = getNonEmptySheetDataRows_(databaseSheet, APP.BASE_HEADERS.length).length > 0;
+
+  if (hasAnyHeader || hasStoredRows) return;
+
   databaseSheet.getRange(1, 1, 1, APP.BASE_HEADERS.length).setValues([APP.BASE_HEADERS]);
   styleHeaderRow_(databaseSheet, APP.BASE_HEADERS.length);
   databaseSheet.setFrozenRows(1);
   databaseSheet.getRange(1, APP.BASE_COLS.STAGE).setNote(
-    'Edite esta aba livremente. As mudanças só serão consolidadas quando a automação "Atualizar CRM" for executada.'
+    'Banco central permanente. Registros existentes nao sao reconstruidos por automacoes ou atualizacoes de visualizacao.'
   );
 
   databaseSheet.getRange('A:A').setNumberFormat('@STRING@'); // ID
@@ -1987,10 +1990,10 @@ function getEmailAutomationConfigs_() {
               'Você sente que esse tipo de parceria faz sentido para o seu perfil e para o seu público?' +
             '</p>' +
             '<p>' +
-              'Fico no aguardo do seu retorno!' +
+              'Posso te mandar mais informações?' +
             '</p>' +
             '<p>' +
-              'Atenciosamente, ' + escapeHtml_(ctx.recruiterName) +
+              'Atenciosamente, ' + escapeHtml_(ctx.attendantName) +
             '</p>' +
           '</div>'
         );
@@ -2108,7 +2111,8 @@ function hasBaseRowChanged_(oldRow, newRow) {
 
 function parseInfluencerHandleInput_(value) {
   const rawValue = String(value || '').trim();
-  const sanitized = sanitizeInfluencerHandle_(rawValue).trim();
+  const handleValue = rawValue.charAt(0) === '@' ? rawValue.slice(1) : rawValue;
+  const sanitized = handleValue.trim();
 
   if (!sanitized) {
     return {
@@ -2118,7 +2122,7 @@ function parseInfluencerHandleInput_(value) {
     };
   }
 
-  if (/\s/.test(sanitized)) {
+  if (/\s/.test(handleValue)) {
     return {
       valid: false,
       sanitized: sanitized,
@@ -2126,11 +2130,19 @@ function parseInfluencerHandleInput_(value) {
     };
   }
 
-  if (isUrlLike_(sanitized)) {
+  if (isUrlLike_(rawValue)) {
     return {
       valid: false,
       sanitized: sanitized,
       error: 'No campo @, não informe links ou URLs. Digite apenas o handle.'
+    };
+  }
+
+  if (sanitized.indexOf('@') !== -1) {
+    return {
+      valid: false,
+      sanitized: sanitized,
+      error: 'No campo @, use no máximo um @ e apenas no início do handle.'
     };
   }
 
@@ -2139,6 +2151,30 @@ function parseInfluencerHandleInput_(value) {
       valid: false,
       sanitized: sanitized,
       error: 'No campo @, use apenas letras, números, ponto e underscore.'
+    };
+  }
+
+  if (sanitized.length > 30) {
+    return {
+      valid: false,
+      sanitized: sanitized,
+      error: 'No campo @, informe no máximo 30 caracteres (sem contar o @ inicial).'
+    };
+  }
+
+  if (sanitized.charAt(0) === '.' || sanitized.charAt(sanitized.length - 1) === '.') {
+    return {
+      valid: false,
+      sanitized: sanitized,
+      error: 'No campo @, o ponto pode ser usado no meio do handle, mas não no início ou no fim.'
+    };
+  }
+
+  if (sanitized.indexOf('..') !== -1) {
+    return {
+      valid: false,
+      sanitized: sanitized,
+      error: 'No campo @, não use dois pontos consecutivos.'
     };
   }
 
@@ -2563,7 +2599,7 @@ function atualizarCRM() {
       });
 
       if (updateResult.updatedRecords > 0) {
-        replaceBaseRowsInSheet_(ctx.baseSheet, workingRows);
+        writeChangedBaseRowsInPlace_(ctx.baseSheet, originalRows, workingRows);
       }
 
       if (updateResult.logs.length) {
@@ -2850,7 +2886,6 @@ function enviarEmailsSelecionados_(config) {
       } catch (error) {
         montarCaptacao_Interno_(ctx, { silent: true });
         refreshCRMView_Interno_(ctx, { silent: true });
-        montarBancoDeDados_Interno_(ctx, { silent: true });
         throw new Error(
           (sentCount ? sentCount + ' e-mail(s) foram enviados antes da falha.\n\n' : '') +
           (error && error.message ? error.message : String(error))
@@ -2859,7 +2894,6 @@ function enviarEmailsSelecionados_(config) {
 
       montarCaptacao_Interno_(ctx, { silent: true });
       refreshCRMView_Interno_(ctx, { silent: true });
-      montarBancoDeDados_Interno_(ctx, { silent: true });
 
       showToastMessage_(
         config.successTitle + '\n\n' +
@@ -2886,33 +2920,9 @@ function montarBancoDeDados() {
 
 function montarBancoDeDados_Interno_(ctx, options) {
   const silent = Boolean(options && options.silent);
-  const baseRows = (options && options.baseRowsOverride) || getSheetDataRows_(ctx.baseSheet, APP.BASE_HEADERS.length);
-
-  ctx.databaseSheet.getRange(1, 1, 1, APP.BASE_HEADERS.length).setValues([APP.BASE_HEADERS]);
-  ctx.databaseSheet.getRange('AA:AA').setNumberFormat('@STRING@');
-  ctx.databaseSheet.getRange('Z:Z').setNumberFormat('dd/MM/yyyy HH:mm:ss');
-  ctx.databaseSheet.getRange('AB:AD').setNumberFormat('dd/MM/yyyy HH:mm:ss');
-  ctx.databaseSheet.hideColumns(APP.BASE_COLS.EMAIL_01_SENT_AT, 3);
-  clearSheetBody_(ctx.databaseSheet, APP.BASE_HEADERS.length);
-
-  if (!baseRows.length) {
-    reaplicarValidacoesBancoDeDados_Interno_(ctx.databaseSheet, ctx.legendSheet);
-    if (!silent) {
-      showToastMessage_('A base local está vazia. Nada foi enviado para o Banco De Dados.', 'Montar Banco De Dados');
-    }
-    return;
-  }
-
-  ctx.databaseSheet
-    .getRange(2, 1, baseRows.length, APP.BASE_HEADERS.length)
-    .setValues(baseRows);
-
-  reaplicarValidacoesBancoDeDados_Interno_(ctx.databaseSheet, ctx.legendSheet);
-
   if (!silent) {
     showToastMessage_(
-      'Banco De Dados montado com sucesso.\n\n' +
-      'Total de registros: ' + baseRows.length,
+      'Banco De Dados e a fonte central permanente.\n\nNenhuma linha foi reconstruida ou removida.',
       'Montar Banco De Dados',
       8
     );
@@ -3822,166 +3832,14 @@ function makeLogRow_(params) {
  * Funções utilitárias e infraestrutura
  ****************************************************/
 
-function migrarBaseLegadaParaBancoDeDados_(ss, legacySheet, databaseSheet) {
-  if (!legacySheet || !databaseSheet) return;
-  if (legacySheet.getSheetId() === databaseSheet.getSheetId()) return;
-
-  const legacyRows = getSheetDataRows_(legacySheet, APP.BASE_HEADERS.length);
-  const databaseRows = getSheetDataRows_(databaseSheet, APP.BASE_HEADERS.length);
-  const merged = [];
-  const seen = {};
-
-  function appendRows_(rows) {
-    rows.forEach(function (row, index) {
-      const id = String(row[APP.BASE_COLS.ID - 1] || '').trim();
-      const fallbackKey = '__ROW__' + index + '__' + String(row[APP.BASE_COLS.NAME - 1] || '').trim();
-      const key = id || fallbackKey;
-
-      if (!(key in seen)) {
-        seen[key] = merged.length;
-        merged.push(row);
-        return;
-      }
-
-      merged[seen[key]] = row;
-    });
-  }
-
-  appendRows_(legacyRows);
-  appendRows_(databaseRows);
-
-  clearSheetBody_(databaseSheet, APP.BASE_HEADERS.length);
-  if (merged.length) {
-    databaseSheet.getRange(2, 1, merged.length, APP.BASE_HEADERS.length).setValues(merged);
-  }
-
-  ss.deleteSheet(legacySheet);
-}
-
-function replaceBaseRowsInSheet_(sheet, rows) {
-  clearSheetBody_(sheet, APP.BASE_HEADERS.length);
-
-  if (rows && rows.length) {
-    sheet.getRange(2, 1, rows.length, APP.BASE_HEADERS.length).setValues(rows);
-  }
-}
-
-function buildAuditTimestampLookups_(logRows) {
-  const createdById = {};
-  const lastStageChangeById = {};
-
-  (logRows || []).forEach(function (row) {
-    const timestamp = row[0];
-    const action = String(row[1] || '').trim();
-    const id = String(row[2] || '').trim();
-
-    if (!id || !(timestamp instanceof Date)) return;
-
-    if (action === APP.LOG_ACTIONS.CREATE && !createdById[id]) {
-      createdById[id] = timestamp;
+function writeChangedBaseRowsInPlace_(sheet, originalRows, workingRows) {
+  (workingRows || []).forEach(function (row, index) {
+    if (!hasBaseRowChanged_(originalRows[index] || [], row)) {
+      return;
     }
 
-    if (action === APP.LOG_ACTIONS.UPDATE_STAGE) {
-      if (!lastStageChangeById[id] || timestamp > lastStageChangeById[id]) {
-        lastStageChangeById[id] = timestamp;
-      }
-    }
+    sheet.getRange(index + 2, 1, 1, APP.BASE_HEADERS.length).setValues([row]);
   });
-
-  return {
-    createdById: createdById,
-    lastStageChangeById: lastStageChangeById
-  };
-}
-
-function ensureBaseAuditDataForSheet_(sheet, auditLookups) {
-  if (!sheet) return;
-
-  sheet.getRange(1, 1, 1, APP.BASE_HEADERS.length).setValues([APP.BASE_HEADERS]);
-  sheet.getRange('B:B').setNumberFormat('dd/MM/yyyy HH:mm:ss');
-  sheet.getRange('I:I').setNumberFormat('dd/MM/yyyy HH:mm:ss');
-  sheet.getRange('Z:Z').setNumberFormat('dd/MM/yyyy HH:mm:ss');
-
-  const rows = getSheetDataRows_(sheet, APP.BASE_HEADERS.length);
-  if (!rows.length) return;
-
-  let changed = false;
-
-  rows.forEach(function (row) {
-    const id = String(row[APP.BASE_COLS.ID - 1] || '').trim();
-    if (!id) return;
-
-    if (isBlank_(row[APP.BASE_COLS.ENTRY_TIMESTAMP - 1])) {
-      row[APP.BASE_COLS.ENTRY_TIMESTAMP - 1] =
-        auditLookups.createdById[id] ||
-        row[APP.BASE_COLS.LAST_INTERACTION - 1] ||
-        new Date();
-      changed = true;
-    }
-
-    if (isBlank_(row[APP.BASE_COLS.LAST_STAGE_CHANGE - 1])) {
-      row[APP.BASE_COLS.LAST_STAGE_CHANGE - 1] =
-        auditLookups.lastStageChangeById[id] ||
-        row[APP.BASE_COLS.LAST_INTERACTION - 1] ||
-        row[APP.BASE_COLS.ENTRY_TIMESTAMP - 1];
-      changed = true;
-    }
-  });
-
-  if (changed) {
-    sheet.getRange(2, 1, rows.length, APP.BASE_HEADERS.length).setValues(rows);
-  }
-}
-
-function ensureBaseAuditData_(ctx) {
-  const logRows = getSheetDataRows_(ctx.logSheet, APP.LOG_HEADERS.length);
-  const auditLookups = buildAuditTimestampLookups_(logRows);
-
-  ensureBaseAuditDataForSheet_(ctx.baseSheet, auditLookups);
-  ensureBaseAuditDataForSheet_(ctx.databaseSheet, auditLookups);
-}
-
-function seedSyncBufferFromExistingSources_(ss, syncBufferSheet, databaseSheet, legacySheet) {
-  const syncRows = getSheetDataRows_(syncBufferSheet, APP.BASE_HEADERS.length);
-  if (syncRows.length) {
-    if (!syncBufferSheet.isSheetHidden()) {
-      syncBufferSheet.hideSheet();
-    }
-    return;
-  }
-
-  const legacyRows = legacySheet ? getSheetDataRows_(legacySheet, APP.BASE_HEADERS.length) : [];
-  const databaseRows = databaseSheet ? getSheetDataRows_(databaseSheet, APP.BASE_HEADERS.length) : [];
-  const merged = [];
-  const seen = {};
-
-  function appendRows_(rows) {
-    rows.forEach(function (row, index) {
-      const id = String(row[APP.BASE_COLS.ID - 1] || '').trim();
-      const fallbackKey = '__ROW__' + index + '__' + String(row[APP.BASE_COLS.NAME - 1] || '').trim();
-      const key = id || fallbackKey;
-
-      if (!(key in seen)) {
-        seen[key] = merged.length;
-        merged.push(row);
-        return;
-      }
-
-      merged[seen[key]] = row;
-    });
-  }
-
-  appendRows_(legacyRows);
-  appendRows_(databaseRows);
-  replaceBaseRowsInSheet_(syncBufferSheet, merged);
-
-  if (legacySheet && legacySheet.getSheetId() !== databaseSheet.getSheetId()) {
-    ss.deleteSheet(legacySheet);
-  }
-
-  if (!syncBufferSheet.isSheetHidden()) {
-    syncBufferSheet.hideSheet();
-  }
 }
 
 function getContext_(options) {
@@ -4057,14 +3915,7 @@ function getContext_(options) {
     throw new Error('A aba "__SYNC_BUFFER__" não existe. Rode primeiro a função "Configurar Estrutura Inicial".');
   }
 
-  const legacyBaseSheet = ss.getSheetByName(attendantName);
-  if (legacyBaseSheet && legacyBaseSheet.getSheetId() !== databaseSheet.getSheetId()) {
-    seedSyncBufferFromExistingSources_(ss, syncBufferSheet, databaseSheet, legacyBaseSheet);
-  } else {
-    seedSyncBufferFromExistingSources_(ss, syncBufferSheet, databaseSheet, null);
-  }
-
-  const baseSheet = syncBufferSheet;
+  const baseSheet = databaseSheet;
 
   let logSheet = ss.getSheetByName(APP.SHEETS.LOG);
   if (!logSheet && createMissing) {
@@ -4291,6 +4142,10 @@ function sincronizarListaProfessores_Interno_(legendSheet, crmSheet) {
 }
 
 function clearSheetBody_(sheet, numCols, startRow, startCol) {
+  if (sheet && typeof sheet.getName === 'function' && sheet.getName() === APP.SHEETS.DATABASE) {
+    throw new Error('Operacao bloqueada: Banco De Dados e a fonte central permanente e nao pode ser limpa ou reconstruida.');
+  }
+
   const firstDataRow = startRow || 2;
   const firstDataCol = startCol || 1;
   const maxRows = sheet.getMaxRows();
@@ -4303,6 +4158,18 @@ function getSheetDataRows_(sheet, numCols, startRow) {
   const lastRow = sheet.getLastRow();
   if (lastRow < firstDataRow) return [];
   return sheet.getRange(firstDataRow, 1, lastRow - firstDataRow + 1, numCols).getValues();
+}
+
+function filterRowsWithContent_(rows) {
+  return (rows || []).filter(function (row) {
+    return row.some(function (value) {
+      return value !== null && typeof value !== 'undefined' && String(value).trim() !== '';
+    });
+  });
+}
+
+function getNonEmptySheetDataRows_(sheet, numCols, startRow) {
+  return filterRowsWithContent_(getSheetDataRows_(sheet, numCols, startRow));
 }
 
 function makeEmptyBaseRow_() {
@@ -4484,8 +4351,6 @@ function reconfigureCaptacaoPreservingPending_(ctx) {
 }
 
 function ensureOperationalLayouts_(ctx) {
-  ensureBaseAuditData_(ctx);
-
   const crmHeader = normalizeText_(ctx.crmSheet.getRange(APP.CRM_LAYOUT.HEADER_ROW, 1).getDisplayValue());
   if (crmHeader !== normalizeText_(APP.CRM_HEADERS[0])) {
     configurarCRM_(ctx.crmSheet);
@@ -4754,7 +4619,7 @@ function updateCaptacaoSummaries_(ctx, baseRows) {
   const fechadoCount = countUniqueStageEventsInMonth_(logRows, cohort.cohortById, 'Fechado');
 
   captacaoSheet.getRange('A2').setValue(totalAdded);
-  captacaoSheet.getRange('G2').setValue(totalAdded ? sentToCRMCount / totalAdded : 0).setNumberFormat('0.00%');
+  captacaoSheet.getRange('G2').setValue(sentToCRMCount);
   captacaoSheet.getRange('I2').setValue(totalAdded ? aulaShowCount / totalAdded : 0).setNumberFormat('0.00%');
   captacaoSheet.getRange('K2').setValue(totalAdded ? fechadoCount / totalAdded : 0).setNumberFormat('0.00%');
 }
@@ -4803,7 +4668,13 @@ function isValidEmail_(value) {
 
 function isUrlLike_(value) {
   const text = String(value || '').trim().toLowerCase();
-  return /^(https?:\/\/|www\.)/.test(text) || text.indexOf('.com') !== -1 || text.indexOf('.br') !== -1;
+  const withoutLeadingAt = text.charAt(0) === '@' ? text.slice(1) : text;
+
+  return (
+    /^[a-z][a-z0-9+.-]*:\/\//.test(withoutLeadingAt) ||
+    /^www\.[^\s/?#]+[/?#]/.test(withoutLeadingAt) ||
+    /^(?:(?:www|m)\.)?(?:instagram\.com|instagr\.am|ig\.me)(?:[/?#]|$)/.test(withoutLeadingAt)
+  );
 }
 
 function isFutureDate_(value) {
