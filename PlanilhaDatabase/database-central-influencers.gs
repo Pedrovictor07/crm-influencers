@@ -116,38 +116,26 @@ const CENTRAL_INFLUENCER_DB = Object.freeze({
     'Status',
     'Detalhes'
   ]),
-  CLIENT_BASE_HEADERS: Object.freeze([
-    'ID',
-    'Timestamp Entrada',
-    'Nome',
-    'Telefone',
-    'Idioma',
-    'Tag',
-    'Etapa / Status',
-    'Atendente',
-    'Data Ultima Interacao',
-    'Data Aula Show',
-    'Proxima Data / Follow-up',
-    'Quali 1',
-    'Quali 2',
-    'Quali 3',
-    'Quali 4',
-    'Quali 5',
-    'Fluxo Atual',
-    'Observacoes',
-    'Professor',
-    'Idade',
-    'Outra Classificacao',
-    '@',
-    'Origem do Registro',
-    'Pedido de Indicacao',
-    'Fonte Do Influencer',
-    'Reservado Z',
-    'Email',
-    'Email 01 enviado em',
-    'Email 02 enviado em',
-    'Email 03 enviado em'
-  ])
+  SOURCE_FIELD_ALIASES: Object.freeze({
+    id: Object.freeze(['ID', 'Influencer ID', 'Codigo', 'ID aluno']),
+    handle: Object.freeze(['@', 'Handle', 'Instagram', 'Usuario', 'Perfil', 'User Instagram']),
+    name: Object.freeze(['Nome', 'Name', 'Influencer', 'Criador', 'Nome do Influencer']),
+    phone: Object.freeze(['Telefone', 'Phone', 'WhatsApp', 'Contato', 'Celular', 'Telefone / WhatsApp']),
+    email: Object.freeze(['Email', 'E-mail', 'E mail', 'Email do Influencer']),
+    stage: Object.freeze(['Etapa / Status', 'Etapa/Status', 'Status', 'Status Atual', 'Etapa', 'Fase', 'Estado Atual', 'Estado Atual do Influ']),
+    lastAction: Object.freeze(['Data Ultima Interacao', 'Ultima Interacao', 'Ultima Acao', 'Ultimo Contato', 'Data Ultima Alteracao de Etapa', 'Atualizado Em']),
+    nextFollowUp: Object.freeze(['Proxima Data / Follow-up', 'Proximo Follow-up', 'Data Proximo Follow-up', 'Follow-up', 'Fup']),
+    entryDate: Object.freeze(['Timestamp Entrada', 'Data Entrada', 'Data de Entrada', 'Criado Em', 'Created At']),
+    showDate: Object.freeze(['Data Aula Show', 'Data Publicacao', 'Data Postagem', 'Publicado Em']),
+    currentFlow: Object.freeze(['Fluxo Atual', 'Pipeline', 'Funil']),
+    platform: Object.freeze(['Plataforma', 'Rede', 'Canal']),
+    tag: Object.freeze(['Tag', 'Nicho', 'Categoria', 'Segmento']),
+    location: Object.freeze(['Cidade/Estado', 'Cidade', 'Estado', 'Localizacao']),
+    language: Object.freeze(['Idioma', 'Lingua']),
+    origin: Object.freeze(['Origem do Registro', 'Origem']),
+    source: Object.freeze(['Fonte Do Influencer', 'Fonte', 'Indicacao']),
+    observations: Object.freeze(['Observacoes', 'Comentarios', 'Notas', 'Instrucoes'])
+  })
 });
 
 function instalarDatabaseCentralInfluencers() {
@@ -667,18 +655,27 @@ function cid_seedClientSpreadsheet_(spreadsheet, gestorName) {
     sheet.setName(CENTRAL_INFLUENCER_DB.DEFAULT_SOURCE_SHEET);
   }
 
-  const headers = CENTRAL_INFLUENCER_DB.CLIENT_BASE_HEADERS;
-  if (sheet.getMaxColumns() < headers.length) {
-    sheet.insertColumnsAfter(sheet.getMaxColumns(), headers.length - sheet.getMaxColumns());
+  const headerWidth = cid_getSourceHeaderWidth_(sheet);
+  if (!headerWidth) {
+    throw new Error('A aba "' + sheet.getName() + '" do template nao possui cabecalhos para importacao.');
   }
-  sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+
   sheet.setFrozenRows(1);
-  sheet.getRange(1, 1, 1, headers.length)
+  sheet.getRange(1, 1, 1, headerWidth)
     .setBackground('#111827')
     .setFontColor('#ffffff')
     .setFontWeight('bold');
 
   cid_writeGestorNameToTagLegend_(spreadsheet, gestorName);
+}
+
+function cid_getSourceHeaderWidth_(sheet) {
+  const width = sheet.getLastColumn();
+  if (width < 1 || sheet.getLastRow() < 1) return 0;
+
+  return sheet.getRange(1, 1, 1, width).getDisplayValues()[0].reduce(function (lastUsedColumn, header, index) {
+    return String(header || '').trim() ? index + 1 : lastUsedColumn;
+  }, 0);
 }
 
 function cid_writeGestorNameToTagLegend_(spreadsheet, gestorName) {
@@ -733,8 +730,8 @@ function cid_findBestSourceSheet_(spreadsheet, preferredName) {
     if (sheet.getLastRow() < 1 || width < 1) return;
 
     const headers = sheet.getRange(1, 1, 1, width).getDisplayValues()[0].map(cid_norm_);
-    const score = ['id', 'nome', '@', 'etapa / status', 'telefone', 'email'].reduce(function (sum, alias) {
-      return sum + (headers.indexOf(cid_norm_(alias)) >= 0 ? 1 : 0);
+    const score = ['id', 'name', 'handle', 'stage', 'phone', 'email', 'lastAction', 'nextFollowUp'].reduce(function (sum, field) {
+      return sum + (cid_hasSourceHeader_(headers, field) ? 1 : 0);
     }, 0);
     if (score > bestScore) {
       bestScore = score;
@@ -747,22 +744,22 @@ function cid_findBestSourceSheet_(spreadsheet, preferredName) {
 
 function cid_mapSourceRecord_(params) {
   const rowObject = params.rowObject;
-  const handle = cid_cleanHandle_(cid_pick_(rowObject, ['@', 'Handle', 'Instagram', 'Usuario', 'Perfil']));
-  const name = String(cid_pick_(rowObject, ['Nome', 'Name', 'Influencer', 'Criador']) || '').trim();
-  const phone = String(cid_pick_(rowObject, ['Telefone', 'Phone', 'WhatsApp', 'Contato']) || '').trim();
-  const email = String(cid_pick_(rowObject, ['Email', 'E-mail']) || '').trim();
-  const stage = String(cid_pick_(rowObject, ['Etapa / Status', 'Status', 'Etapa', 'Fase']) || '').trim();
-  const influencerId = String(cid_pick_(rowObject, ['ID', 'Influencer ID', 'Codigo']) || '').trim();
+  const handle = cid_cleanHandle_(cid_sourceValue_(rowObject, 'handle'));
+  const name = String(cid_sourceValue_(rowObject, 'name') || '').trim();
+  const phone = String(cid_sourceValue_(rowObject, 'phone') || '').trim();
+  const email = String(cid_sourceValue_(rowObject, 'email') || '').trim();
+  const stage = String(cid_sourceValue_(rowObject, 'stage') || '').trim();
+  const influencerId = String(cid_sourceValue_(rowObject, 'id') || '').trim();
 
   if (!handle && !name && !phone && !email && !stage) {
     return null;
   }
 
-  const lastAction = cid_coerceDate_(cid_pick_(rowObject, ['Data Ultima Interacao', 'Ultima Interacao', 'Ultima Acao', 'Ultimo Contato', 'Atualizado Em']));
-  const nextFollowUp = cid_coerceDate_(cid_pick_(rowObject, ['Proxima Data / Follow-up', 'Proximo Follow-up', 'Follow-up', 'Fup']));
-  const entryDate = cid_coerceDate_(cid_pick_(rowObject, ['Timestamp Entrada', 'Data Entrada', 'Criado Em', 'Created At']));
-  const showDate = cid_coerceDate_(cid_pick_(rowObject, ['Data Aula Show', 'Data Publicacao', 'Data Postagem', 'Publicado Em']));
-  const currentFlow = String(cid_pick_(rowObject, ['Fluxo Atual', 'Pipeline', 'Funil']) || '').trim();
+  const lastAction = cid_coerceDate_(cid_sourceValue_(rowObject, 'lastAction'));
+  const nextFollowUp = cid_coerceDate_(cid_sourceValue_(rowObject, 'nextFollowUp'));
+  const entryDate = cid_coerceDate_(cid_sourceValue_(rowObject, 'entryDate'));
+  const showDate = cid_coerceDate_(cid_sourceValue_(rowObject, 'showDate'));
+  const currentFlow = String(cid_sourceValue_(rowObject, 'currentFlow') || '').trim();
   const now = new Date();
   const daysWithoutAction = cid_daysBetween_(lastAction || entryDate, now);
   const health = cid_calculateRecordHealth_(stage, lastAction, nextFollowUp);
@@ -791,16 +788,16 @@ function cid_mapSourceRecord_(params) {
     influencerId,
     name,
     handle,
-    String(cid_pick_(rowObject, ['Plataforma', 'Rede', 'Canal']) || (handle ? 'Instagram' : '')).trim(),
-    String(cid_pick_(rowObject, ['Tag', 'Nicho', 'Categoria', 'Segmento']) || '').trim(),
-    String(cid_pick_(rowObject, ['Cidade/Estado', 'Cidade', 'Estado', 'Localizacao']) || '').trim(),
+    String(cid_sourceValue_(rowObject, 'platform') || (handle ? 'Instagram' : '')).trim(),
+    String(cid_sourceValue_(rowObject, 'tag') || '').trim(),
+    String(cid_sourceValue_(rowObject, 'location') || '').trim(),
     phone,
     email,
-    String(cid_pick_(rowObject, ['Idioma', 'Lingua']) || '').trim(),
+    String(cid_sourceValue_(rowObject, 'language') || '').trim(),
     stage,
     currentFlow,
-    String(cid_pick_(rowObject, ['Origem do Registro', 'Origem']) || '').trim(),
-    String(cid_pick_(rowObject, ['Fonte Do Influencer', 'Fonte', 'Indicacao']) || '').trim(),
+    String(cid_sourceValue_(rowObject, 'origin') || '').trim(),
+    String(cid_sourceValue_(rowObject, 'source') || '').trim(),
     entryDate || '',
     lastAction || '',
     showDate || '',
@@ -809,7 +806,7 @@ function cid_mapSourceRecord_(params) {
     health,
     score,
     flags.join(' | '),
-    String(cid_pick_(rowObject, ['Observacoes', 'Comentarios', 'Notas', 'Instrucoes']) || '').trim(),
+    String(cid_sourceValue_(rowObject, 'observations') || '').trim(),
     cid_buildProfileLink_(handle),
     params.sourceSpreadsheet.getUrl(),
     now
@@ -1192,6 +1189,17 @@ function cid_headerIndex_(headers) {
     index[header] = position;
   });
   return index;
+}
+
+function cid_sourceValue_(rowObject, field) {
+  return cid_pick_(rowObject, CENTRAL_INFLUENCER_DB.SOURCE_FIELD_ALIASES[field] || []);
+}
+
+function cid_hasSourceHeader_(headers, field) {
+  const aliases = CENTRAL_INFLUENCER_DB.SOURCE_FIELD_ALIASES[field] || [];
+  return aliases.some(function (alias) {
+    return headers.indexOf(cid_norm_(alias)) >= 0;
+  });
 }
 
 function cid_pick_(rowObject, aliases) {
