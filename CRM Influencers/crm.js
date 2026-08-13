@@ -1489,9 +1489,9 @@ function hideSheetSafely_(ss, sheet, fallbackSheet) {
 }
 
 function reaplicarValidacoesCaptacao_Interno_(captacaoSheet) {
-  const totalRows = Math.max(captacaoSheet.getMaxRows() - APP.CAPTACAO_LAYOUT.INPUT_HEADER_ROW, 1);
+  const totalRows = Math.max(captacaoSheet.getMaxRows() - APP.CAPTACAO_LAYOUT.TABLE_DATA_START_ROW + 1, 1);
   const inputRows = Math.max(captacaoSheet.getMaxRows() - APP.CAPTACAO_LAYOUT.INPUT_START_ROW + 1, 1);
-  const stageList = getCaptacaoManualStageOptions_();
+  const stageList = getCaptacaoStageValidationOptions_();
   const sourceList = APP.CAPTACAO_SOURCE_OPTIONS.slice();
 
   captacaoSheet
@@ -1850,10 +1850,10 @@ function montarCaptacao_Interno_(ctx, options) {
   ensureOperationalLayouts_(ctx);
   const baseRows = (options && options.baseRowsOverride) || getSheetDataRows_(ctx.baseSheet, APP.BASE_HEADERS.length);
   clearSheetBody_(ctx.captacaoSheet, APP.CAPTACAO_HEADERS.length, APP.CAPTACAO_LAYOUT.TABLE_DATA_START_ROW, APP.CAPTACAO_LAYOUT.TABLE_START_COLUMN);
+  reaplicarValidacoesCaptacao_Interno_(ctx.captacaoSheet);
   updateCaptacaoSummaries_(ctx, baseRows);
 
   if (!baseRows.length) {
-    reaplicarValidacoesCaptacao_Interno_(ctx.captacaoSheet);
     if (!silent) {
       showToastMessage_('A base local está vazia. Nada foi enviado para a Captação.', 'Montar Captação');
     }
@@ -1881,8 +1881,6 @@ function montarCaptacao_Interno_(ctx, options) {
       .getRange(APP.CAPTACAO_LAYOUT.TABLE_DATA_START_ROW, APP.CAPTACAO_LAYOUT.TABLE_START_COLUMN, captacaoRows.length, APP.CAPTACAO_HEADERS.length)
       .setValues(captacaoRows);
   }
-
-  reaplicarValidacoesCaptacao_Interno_(ctx.captacaoSheet);
 
   if (!silent) {
     showToastMessage_(
@@ -4308,6 +4306,12 @@ function getCaptacaoManualStageOptions_() {
   return APP.CAPTACAO_STAGES.slice();
 }
 
+function getCaptacaoStageValidationOptions_() {
+  return APP.CAPTACAO_STAGES
+    .concat(['Fazer FUP'])
+    .concat(APP.CAPTACAO_INTERNAL_STAGES);
+}
+
 function getDatabaseManualStageOptions_() {
   const merged = [];
   const seen = {};
@@ -4672,7 +4676,7 @@ function isUrlLike_(value) {
 
   return (
     /^[a-z][a-z0-9+.-]*:\/\//.test(withoutLeadingAt) ||
-    /^www\.[^\s/?#]+[/?#]/.test(withoutLeadingAt) ||
+    /^www\.[^\s/?#]+(?:[/?#]|$)/.test(withoutLeadingAt) ||
     /^(?:(?:www|m)\.)?(?:instagram\.com|instagr\.am|ig\.me)(?:[/?#]|$)/.test(withoutLeadingAt)
   );
 }
